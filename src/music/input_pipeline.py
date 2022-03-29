@@ -79,13 +79,16 @@ def _preprocess_composition(composition: Composition) -> ([Bar], [Bar]):
     # Zip the chunked bars
     zipped_chunks = list(zip(lead_chunked, accompaniment_chunked))
 
+    # Calculate difficulty values of bars
+    map(_calculate_difficulty, zipped_chunks)
+
     return zipped_chunks
 
 
 def _augment_bar(bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
     """ Augment the given bars in order to create a larger training set
 
-    Transposes the given bars by each value in the range of `[-5, 6]`
+    Transposes the given bars by each value in the range of `[-5, 6]`.
 
     Args:
         bars: A tuple of bars to augment
@@ -105,8 +108,10 @@ def _augment_bar(bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
 
         # Handle bars at the same time
         for lead_bar, accompanying_bar in zip(lead_unedited, accompanying_unedited):
-            lead_bar.transpose(transpose_by)
-            accompanying_bar.transpose(transpose_by)
+            if lead_bar.transpose(transpose_by):
+                lead_bar.difficulty
+            if accompanying_bar.transpose(transpose_by):
+                accompanying_bar.difficulty
 
             # Append transposed bars to the placeholder objects
             lead_bars.append(lead_bar)
@@ -115,6 +120,13 @@ def _augment_bar(bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
         augmented_bars.append((lead_bars, accompanying_bars))
 
     return augmented_bars
+
+
+def _calculate_difficulty(bars: ([Bar], [Bar])) -> None:
+    for bar in bars[0]:
+        bar.difficulty
+    for bar in bars[1]:
+        bar.difficulty
 
 
 def _find_word(word, sentence):
