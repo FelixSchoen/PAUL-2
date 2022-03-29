@@ -7,6 +7,7 @@ import mido
 from sCoda import Composition, Bar
 
 from src.util.util import chunks, flatten
+from src.util.util_visualiser import get_message_lengths_and_difficulties
 
 
 def load_midi_files(directory: str):
@@ -17,13 +18,18 @@ def load_midi_files(directory: str):
             files.append(os.path.join(dir_path, filename))
 
     pool = Pool()
-    compositions = pool.map(_load_composition, files)
-    preprocessed_bars = flatten(pool.map(_preprocess_composition, compositions))
-    augmented_bars = flatten(pool.map(_augment_bar, preprocessed_bars))
 
-    print(f"Compositions {compositions}")
-    print(f"Preprocessed {preprocessed_bars}")
-    print(f"Augmented {augmented_bars}")
+    # Load compositions
+    compositions = pool.map(_load_composition, files)
+    # Preprocess bars
+    preprocessed_bars = flatten(pool.map(_preprocess_composition, compositions))
+    # Set difficulty of bars
+    preprocessed_bars = flatten(pool.map(_calculate_difficulty, chunks(preprocessed_bars, 32)))
+
+    # Augment bars after difficulty calculation
+    augmented_bars = flatten(map(_augment_bar, preprocessed_bars))
+
+    get_message_lengths_and_difficulties(augmented_bars)
 
 
 def _load_composition(file_path: str):
@@ -60,6 +66,8 @@ def _load_composition(file_path: str):
 def _preprocess_composition(composition: Composition) -> ([Bar], [Bar]):
     """ Preprocesses the given composition, extracting a pair of up to 4 bars
 
+    Sets the `difficulty` value for the bars as well, efficiently calculating it for all the bars since this method is parallelised.
+
     Args:
         composition: The composition to preprocess
 
@@ -80,7 +88,7 @@ def _preprocess_composition(composition: Composition) -> ([Bar], [Bar]):
     zipped_chunks = list(zip(lead_chunked, accompaniment_chunked))
 
     # Calculate difficulty values of bars
-    map(_calculate_difficulty, zipped_chunks)
+    # list(map(_calculate_difficulty, chunks(zipped_chunks, 32)))
 
     return zipped_chunks
 
@@ -109,9 +117,9 @@ def _augment_bar(bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
         # Handle bars at the same time
         for lead_bar, accompanying_bar in zip(lead_unedited, accompanying_unedited):
             if lead_bar.transpose(transpose_by):
-                lead_bar.difficulty
+                lead_bar.set_difficulty()
             if accompanying_bar.transpose(transpose_by):
-                accompanying_bar.difficulty
+                accompanying_bar.set_difficulty()
 
             # Append transposed bars to the placeholder objects
             lead_bars.append(lead_bar)
@@ -122,11 +130,14 @@ def _augment_bar(bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
     return augmented_bars
 
 
-def _calculate_difficulty(bars: ([Bar], [Bar])) -> None:
-    for bar in bars[0]:
-        bar.difficulty
-    for bar in bars[1]:
-        bar.difficulty
+def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> None:
+    for chunk in bar_chunks:
+        for bar in chunk[0]:
+            bar.set_difficulty()
+        for bar in chunk[1]:
+            bar.set_difficulty()
+
+    return bar_chunks
 
 
 def _find_word(word, sentence):
