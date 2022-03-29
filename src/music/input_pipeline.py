@@ -1,5 +1,7 @@
 import copy
+import logging
 import os.path
+import pickle
 import re
 from multiprocessing import Pool
 
@@ -7,7 +9,6 @@ import mido
 from sCoda import Composition, Bar
 
 from src.util.util import chunks, flatten
-from src.util.util_visualiser import get_message_lengths_and_difficulties
 
 
 def load_midi_files(directory: str):
@@ -17,19 +18,32 @@ def load_midi_files(directory: str):
         for filename in [f for f in filenames if f.endswith(".mid")]:
             files.append(os.path.join(dir_path, filename))
 
+    # files = remove_random(files, 0.9)
+
     pool = Pool()
 
-    # Load compositions
-    compositions = pool.map(_load_composition, files)
-    # Preprocess bars
-    preprocessed_bars = flatten(pool.map(_preprocess_composition, compositions))
-    # Set difficulty of bars
-    preprocessed_bars = flatten(pool.map(_calculate_difficulty, chunks(preprocessed_bars, 32)))
+    for i, files_chunk in enumerate(chunks(files, 8)):
+        # Load compositions
+        compositions = pool.map(_load_composition, files)
+        # Preprocess bars
+        preprocessed_bars = flatten(pool.map(_preprocess_composition, compositions))
+        # Set difficulty of bars
+        preprocessed_bars = flatten(pool.map(_calculate_difficulty, chunks(preprocessed_bars, 32)))
 
-    # Augment bars after difficulty calculation
-    augmented_bars = flatten(map(_augment_bar, preprocessed_bars))
+        # Augment bars after difficulty calculation
+        augmented_bars = flatten(map(_augment_bar, preprocessed_bars))
 
-    get_message_lengths_and_difficulties(augmented_bars)
+        with open(f"D:/Documents/Coding/Repository/Badura/out/pickle/preprocessed_bars_{i}.pickle", "wb+") as f:
+            pickle.dump(preprocessed_bars, f)
+
+        with open(f"D:/Documents/Coding/Repository/Badura/out/pickle/preprocessed_bars_{i}.pickle", "rb") as f:
+            asdf = pickle.load(f)
+
+        print(f"Len ori {len(preprocessed_bars)}, len pickle {len(asdf)}")
+
+        logging.info(f"Finished chunk {i + 1}")
+
+    # get_message_lengths_and_difficulties(preprocessed_bars)
 
 
 def _load_composition(file_path: str):

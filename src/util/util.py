@@ -1,3 +1,6 @@
+import random
+
+
 def chunks(lst, n):
     """ Yields chunks of size `n`
 
@@ -14,3 +17,7 @@ def chunks(lst, n):
 
 def flatten(lst):
     return [item for sublist in lst for item in sublist]
+
+
+def remove_random(lst, n):
+    return random.sample(lst, int(len(lst) * (1 - n)))

@@ -3,15 +3,16 @@ import os
 import tensorflow as tf
 from sCoda import Composition
 
-from src import settings
 from src.music.input_pipeline import load_midi_files
 from src.music.retriever import dataframe_to_numeric_representation
+from src.settings import DATA_PATH
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def test_load_files():
-    load_midi_files("resources")
+    # load_midi_files("resources")
+    load_midi_files(DATA_PATH)
 
 
 def test_asdf():
