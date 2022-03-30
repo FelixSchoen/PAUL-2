@@ -1,14 +1,14 @@
 import copy
 import logging
 import os.path
-import pickle
 import re
 from multiprocessing import Pool
 
 import mido
 from sCoda import Composition, Bar
 
-from src.util.util import chunks, flatten
+from src.util.util import chunks, flatten, remove_random
+from src.util.util_visualiser import get_message_lengths_and_difficulties
 
 
 def load_midi_files(directory: str):
@@ -20,30 +20,31 @@ def load_midi_files(directory: str):
 
     # files = remove_random(files, 0.9)
 
-    pool = Pool()
+    for file in files:
+        logging.info(f"Loading {file}...")
+        composition = _load_composition(file)
+        preprocessed_bars = _preprocess_composition(composition)
+        _calculate_difficulty(preprocessed_bars)
+        list(map(_augment_bar, preprocessed_bars))
 
-    for i, files_chunk in enumerate(chunks(files, 8)):
-        # Load compositions
-        compositions = pool.map(_load_composition, files)
-        # Preprocess bars
-        preprocessed_bars = flatten(pool.map(_preprocess_composition, compositions))
-        # Set difficulty of bars
-        preprocessed_bars = flatten(pool.map(_calculate_difficulty, chunks(preprocessed_bars, 32)))
+    # pool = Pool()
+    #
+    # bars = flatten(pool.map(_load, list(chunks(files, int(len(files) / 16)))))
+    # get_message_lengths_and_difficulties(bars)
 
-        # Augment bars after difficulty calculation
-        augmented_bars = flatten(map(_augment_bar, preprocessed_bars))
 
-        with open(f"D:/Documents/Coding/Repository/Badura/out/pickle/preprocessed_bars_{i}.pickle", "wb+") as f:
-            pickle.dump(preprocessed_bars, f)
+def _load(files: [str]):
+    # Load compositions
+    compositions = list(map(_load_composition, files))
+    # Preprocess bars
+    preprocessed_bars = flatten(list(map(_preprocess_composition, compositions)))
+    # Set difficulty of bars
+    preprocessed_bars = flatten(list(map(_calculate_difficulty, chunks(preprocessed_bars, 32))))
 
-        with open(f"D:/Documents/Coding/Repository/Badura/out/pickle/preprocessed_bars_{i}.pickle", "rb") as f:
-            asdf = pickle.load(f)
+    # Augment bars after difficulty calculation
+    augmented_bars = flatten(list(map(_augment_bar, preprocessed_bars)))
 
-        print(f"Len ori {len(preprocessed_bars)}, len pickle {len(asdf)}")
-
-        logging.info(f"Finished chunk {i + 1}")
-
-    # get_message_lengths_and_difficulties(preprocessed_bars)
+    return augmented_bars
 
 
 def _load_composition(file_path: str):
@@ -77,10 +78,11 @@ def _load_composition(file_path: str):
     return composition
 
 
-def _preprocess_composition(composition: Composition) -> ([Bar], [Bar]):
-    """ Preprocesses the given composition, extracting a pair of up to 4 bars
+def _preprocess_composition(composition: Composition) -> [([Bar], [Bar])]:
+    """ Preprocesses the given composition, extracting pairs of up to 4 bars
 
-    Sets the `difficulty` value for the bars as well, efficiently calculating it for all the bars since this method is parallelised.
+    Sets the `difficulty` value for the bars as well, efficiently calculating it for all the bars since this method
+    is parallelised.
 
     Args:
         composition: The composition to preprocess
@@ -100,9 +102,6 @@ def _preprocess_composition(composition: Composition) -> ([Bar], [Bar]):
 
     # Zip the chunked bars
     zipped_chunks = list(zip(lead_chunked, accompaniment_chunked))
-
-    # Calculate difficulty values of bars
-    # list(map(_calculate_difficulty, chunks(zipped_chunks, 32)))
 
     return zipped_chunks
 

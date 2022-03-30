@@ -11,8 +11,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def test_load_files():
-    # load_midi_files("resources")
-    load_midi_files(DATA_PATH)
+
+    load_midi_files("resources")
+    # load_midi_files(DATA_PATH)
 
 
 def test_asdf():
