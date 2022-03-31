@@ -3,7 +3,7 @@ import os
 import tensorflow as tf
 from sCoda import Composition
 
-from src.music.input_pipeline import load_midi_files
+from src.music.input_pipeline import store_midi_files, load_stored_bars
 from src.music.retriever import dataframe_to_numeric_representation
 from src.settings import DATA_PATH
 
@@ -12,8 +12,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 def test_load_files():
 
-    load_midi_files("resources")
-    # load_midi_files(DATA_PATH)
+    # load_midi_files("resources")
+    store_midi_files(DATA_PATH)
+    load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle")
 
 
 def test_asdf():

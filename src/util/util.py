@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 
 
 def chunks(lst, n):
@@ -13,6 +14,10 @@ def chunks(lst, n):
     """
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+
+def file_exists(filepath):
+    return Path(filepath).is_file()
 
 
 def flatten(lst):

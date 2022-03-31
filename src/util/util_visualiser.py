@@ -3,11 +3,11 @@ import numpy as np
 from sCoda import Bar
 
 
-def get_message_lengths_and_difficulties(bars: [([Bar], [Bar])]):
+def get_message_lengths_and_difficulties(input_bars: [([Bar], [Bar])]):
     messages = []
     difficulties = []
 
-    for bar_tuple in bars:
+    for bar_tuple in input_bars:
         bars = bar_tuple[0]
         bars.extend(bar_tuple[1])
 
