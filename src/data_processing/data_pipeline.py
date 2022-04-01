@@ -61,36 +61,21 @@ def store_midi_files(directory: str) -> None:
 
 
 def undefined(bars: [([Bar], [Bar])]):
-    lead_sequences = np.array([], dtype=np.int16)
-    lead_difficulties = np.array([], dtype=np.float16)
-    acmp_sequences = np.array([], dtype=np.int16)
-    acmp_difficulties = np.array([], dtype=np.float16)
-
-    for entry in bars:
-        lead_sequence, lead_difficulty = _bars_to_token(entry[0])
-        acmp_sequence, acmp_difficulty = _bars_to_tensor(entry[1])
-
-        # Filter long sequences
-        if max(len(lead_sequence), len(lead_difficulty), len(acmp_sequence),
-               len(acmp_difficulty)) <= SEQUENCE_MAX_LENGTH:
-            lead_sequences = np.append(lead_sequences, _pad_array(lead_sequence))
-            lead_difficulties = np.append(lead_difficulties, _pad_array(lead_difficulty))
-            acmp_sequences = np.append(acmp_sequences, _pad_array(acmp_sequence))
-            acmp_difficulties = np.append(acmp_difficulties, _pad_array(acmp_difficulty))
-
-    print(lead_sequences)
-    print(lead_difficulties)
-    print(acmp_sequences)
-    print(acmp_difficulties)
+    data_rows = map(_bar_tuple_to_token_tuple, bars)
+    data_rows = filter(_filter_length, data_rows)
+    data_rows = map(_pad_tuples, data_rows)
 
     # Construct dataset
-    ds = tf.data.Dataset.from_tensor_slices((lead_sequences, lead_difficulties, acmp_sequences, acmp_difficulties))
-    ds.cache()
-    ds.shuffle(BUFFER_SIZE)
-    ds.batch(BATCH_SIZE)
-    ds.filter(filter_length)
+    ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
+        .cache() \
+        .shuffle(BUFFER_SIZE) \
+        .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
 
-    pass
+    elem = next(iter(ds))
+    lead_seq, lead_dif, acmp_seq, acmp_dif = next(iter(elem))
+    print(lead_seq)
+    print(lead_dif)
 
 
 def _augment_bar(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
@@ -146,34 +131,35 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
     return bar_chunks
 
 
-def _bars_to_token(bars: [Bar]):
-    sequence = np.array([])
-    difficulties = np.array([])
+def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
+    lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
 
-    index = 0
+    for i, (seq, dif) in enumerate([(lead_seq, lead_dif), (acmp_seq, acmp_dif)]):
+        for bar in bars[i]:
+            data_frame = bar.to_relative_dataframe()
 
-    for bar in bars:
-        data_frame = bar.to_relative_dataframe()
+            # Sanity check
+            assert len(data_frame) > 0
 
-        # Sanity check
-        assert len(data_frame) > 0
+            # Pandas dataframe to list of tokens
+            for k, row in data_frame.iterrows():
+                try:
+                    token = Tokenizer.tokenize(row)
+                    seq.append(token)
+                    dif.append(bar.difficulty)
+                except UnexpectedValueException:
+                    pass
 
-        # Pandas dataframe to list of tokens
-        for k, row in data_frame.iterrows():
-            try:
-                token = Tokenizer.tokenize(row)
-                sequence = np.append(sequence, token)
-                difficulties = np.append(difficulties, bar.difficulty)
-            except UnexpectedValueException:
-                pass
+        # Add start and stop messages
+        seq.insert(0, -1)
+        dif.insert(0, -1)
+        seq.append(-2)
+        dif.append(-2)
 
-    # Add start and stop messages
-    sequence = np.insert(sequence, 0, -1)
-    difficulties = np.insert(difficulties, 0, -1)
-    sequence = np.append(sequence, -2)
-    difficulties = np.append(difficulties, -2)
-
-    return sequence, difficulties
+    return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.float16), \
+           tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.float16)
+    # return np.asarray(lead_seq, dtype=np.int16), np.asarray(lead_dif, dtype=np.float16), \
+    #        np.asarray(acmp_seq, dtype=np.int16), np.asarray(acmp_dif, dtype=np.float16)
 
 
 def _bars_to_tensor(bars: [Bar]):
@@ -239,6 +225,15 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
     zipped_chunks = list(zip(lead_chunked, acmp_chunked))
 
     return zipped_chunks
+
+
+def _filter_length(*args):
+    length = 0
+
+    for element in args:
+        length = max(length, len(element))
+
+    return length <= SEQUENCE_MAX_LENGTH
 
 
 def _find_word(word, sentence) -> re.Match:
@@ -335,24 +330,13 @@ def _load_stored_bars(filepath_tuple) -> [([Bar], [Bar])]:
     return from_pickle
 
 
-def _pad_array(array, final_length: int = SEQUENCE_MAX_LENGTH) -> np.array:
-    if len(array) >= final_length:
-        return array
-    return np.pad(array, (0, SEQUENCE_MAX_LENGTH - array.shape[0]), "constant")
+def _pad_tuples(tuples_to_pad):
+    results = []
 
+    for ele in tuples_to_pad:
+        results.append(np.pad(ele, (0, SEQUENCE_MAX_LENGTH - ele.shape[0]), "constant"))
 
-# TODO Update
-def filter_length(*args):
-    length = 0
-
-    for i in range(0, len(args)):
-        print(tf.shape(args[i]))
-        # length = max(length, tf.shape(args[i])[] if args[i] is not None else 0)
-
-    # len1 = tf.shape(src)[1] if src is not None else 0
-    # len2 = tf.shape(trg)[2] if trg is not None else 0
-    # maximum = tf.maximum(len1, len2)
-    return length <= SEQUENCE_MAX_LENGTH
+    return results
 
 
 class Tokenizer:
