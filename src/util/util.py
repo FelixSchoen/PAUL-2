@@ -20,9 +20,26 @@ def file_exists(filepath):
     return Path(filepath).is_file()
 
 
-def flatten(lst):
+def flatten(lst) -> []:
+    """ Flattens the given list, reducing it by one level.
+
+    Args:
+        lst: The list to flatten
+
+    Returns: The flattened list
+
+    """
     return [item for sublist in lst for item in sublist]
 
 
-def remove_random(lst, n):
+def remove_random(lst, n) -> []:
+    """ Removes a percentage of the list's contents, randomly chosen.
+
+    Args:
+        lst: The list to remove items from
+        n: The percentage to remove
+
+    Returns: A new list, containing the sampled elements
+
+    """
     return random.sample(lst, int(len(lst) * (1 - n)))

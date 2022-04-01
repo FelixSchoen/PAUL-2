@@ -7,10 +7,12 @@ import re
 from multiprocessing import Pool
 
 import mido
+import tensorflow as tf
+from pandas import DataFrame
 from sCoda import Composition, Bar
 
-from src.util.util import chunks, flatten, file_exists, remove_random
-from src.util.util_visualiser import get_message_lengths_and_difficulties
+from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_PATH, CONSECUTIVE_BAR_LENGTH
+from src.util.util import chunks, flatten, file_exists
 
 
 def load_stored_bars(directory: str) -> [([Bar], [Bar])]:
@@ -30,9 +32,9 @@ def load_stored_bars(directory: str) -> [([Bar], [Bar])]:
             files.append((os.path.join(dir_path, filename), filename))
 
     pool = Pool()
-    bars = flatten(pool.map(_load_pickled_file, files))
+    bars = flatten(pool.map(_load_stored_bars, files))
 
-    get_message_lengths_and_difficulties(bars)
+    return bars
 
 
 def store_midi_files(directory: str) -> None:
@@ -44,15 +46,27 @@ def store_midi_files(directory: str) -> None:
     """
     files = []
 
+    # Handle all MIDI files in the given directory and subdirectories
     for dir_path, _, filenames in os.walk(directory):
         for filename in [f for f in filenames if f.endswith(".mid")]:
             files.append((os.path.join(dir_path, filename), filename))
 
-    files = remove_random(files, 0.9)
+    # Separate into chunks in order to process in parallel
     files_chunks = chunks(files, 16)
 
     pool = Pool()
-    pool.map(_load_and_store_midi_files, files_chunks)
+    pool.map(_store_midi_files, files_chunks)
+
+
+def undefined(bars: [([Bar], [Bar])]):
+    lead_sequences = []
+    lead_difficulties = []
+    accompanying_sequences = []
+    accompanying_difficulties = []
+
+    for entry in bars:
+        pass
+    pass
 
 
 def _augment_bar(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
@@ -108,8 +122,26 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
     return bar_chunks
 
 
+def _dataframe_to_numeric_representation(data_frame: DataFrame):
+    sequence = []
+
+    # Pandas dataframe to list of tokens
+    for k, row in data_frame.iterrows():
+        token = Tokenizer.tokenize(row)
+        if token is not None and token > 0:
+            sequence.append(token)
+
+    # Convert list to tensor
+    tensor = tf.convert_to_tensor(sequence, dtype="int16")
+    # Define how much to pad on each side
+    paddings = [[0, SEQUENCE_MAX_LENGTH - tf.shape(tensor)[0]]]
+    # Pad tensor
+    tensor = tf.pad(tensor, paddings, "CONSTANT", constant_values=0)
+    return tensor
+
+
 def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]:
-    """ Extracts pairs of up to 4 bars from the given composition.
+    """ Extracts pairs of up to `CONSECUTIVE_BAR_LENGTH` bars from the given composition.
 
     Args:
         composition: The composition to preprocess
@@ -124,8 +156,8 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
     assert len(lead_track.bars) == len(accompanying_track.bars)
 
     # Chunk the bars
-    lead_chunked = list(chunks(lead_track.bars, 4))
-    accompaniment_chunked = list(chunks(accompanying_track.bars, 4))
+    lead_chunked = list(chunks(lead_track.bars, CONSECUTIVE_BAR_LENGTH))
+    accompaniment_chunked = list(chunks(accompanying_track.bars, CONSECUTIVE_BAR_LENGTH))
 
     # Zip the chunked bars
     zipped_chunks = list(zip(lead_chunked, accompaniment_chunked))
@@ -146,7 +178,7 @@ def _find_word(word, sentence) -> re.Match:
     return re.compile(fr"\b({word})\b", flags=re.IGNORECASE).search(sentence)
 
 
-def _load_and_store_midi_files(files) -> None:
+def _store_midi_files(files) -> None:
     """ Loads and stores the MIDI files given.
 
     Args:
@@ -154,7 +186,7 @@ def _load_and_store_midi_files(files) -> None:
 
     """
     for filepath, filename in files:
-        zip_file_path = f"D:/Documents/Coding/Repository/Badura/out/pickle/{filename[:-4]}.zip"
+        zip_file_path = DATA_COMPOSITIONS_PICKLE_OUTPUT_PATH.format(filename[:-4])
 
         if file_exists(zip_file_path):
             logging.info(f"Skipping {filename}")
@@ -209,7 +241,7 @@ def _load_composition(file_path: str) -> Composition:
     return composition
 
 
-def _load_pickled_file(filepath_tuple) -> [([Bar], [Bar])]:
+def _load_stored_bars(filepath_tuple) -> [([Bar], [Bar])]:
     """ Loads a pickled and preprocessed composition.
 
     Args:
@@ -223,4 +255,59 @@ def _load_pickled_file(filepath_tuple) -> [([Bar], [Bar])]:
     print(f"Loading {filename}...")
     with gzip.open(filepath, "rb") as f:
         from_pickle = pickle.load(f)
-        return from_pickle
+
+    return from_pickle
+
+
+# TODO Update
+def filter_length(src, trg):
+    len1 = tf.shape(src)[1] if src is not None else 0
+    len2 = tf.shape(trg)[2] if trg is not None else 0
+    maximum = tf.maximum(len1, len2)
+    return maximum < SEQUENCE_MAX_LENGTH
+
+
+class Tokenizer:
+    """ Tokenizer for sequences.
+
+    Ranges:
+    [0]         ... padding
+    [1]         ... start
+    [2]         ... stop
+    [3 - 26]    ... wait
+    [27 - 114]  ... note on
+    [115 - 202] ... note off
+
+    """
+
+    @staticmethod
+    def tokenize(entry):
+        value = 0
+        msg_type = entry["message_type"]
+
+        if msg_type == "wait":
+            shifter = 3
+            value = int(entry["time"]) - 1
+        elif msg_type == "note_on":
+            shifter = 3 + 24
+            value = int(entry["note"]) - 21
+        elif msg_type == "note_off":
+            shifter = 3 + 24 + 88
+            value = int(entry["note"]) - 21
+        else:
+            shifter = -1
+
+        return shifter + value
+
+    @staticmethod
+    def detokenize(token):
+        if token <= 0:
+            return None
+        elif 3 <= token <= 26:
+            return {"message_type": "wait", "time": token}
+        elif 27 <= token <= 114:
+            return {"message_type": "note_on", "note": token - 27 + 21}
+        elif 115 <= token <= 202:
+            return {"message_type": "note_off", "note": token - 115 + 21}
+        else:
+            assert False
