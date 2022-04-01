@@ -17,6 +17,21 @@ from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FI
 from src.util.util import chunks, flatten, file_exists
 
 
+def load_dataset(bars: [([Bar], [Bar])]):
+    data_rows = map(_bar_tuple_to_token_tuple, bars)
+    data_rows = filter(_filter_length, data_rows)
+    data_rows = map(_pad_tuples, data_rows)
+
+    # Construct dataset
+    ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
+        .cache() \
+        .shuffle(BUFFER_SIZE) \
+        .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
+
+    return ds
+
+
 def load_stored_bars(directory: str) -> [([Bar], [Bar])]:
     """ Loads the stored bars from the given directory into memory.
 
@@ -58,24 +73,6 @@ def store_midi_files(directory: str) -> None:
 
     pool = Pool()
     pool.map(_store_midi_files, files_chunks)
-
-
-def undefined(bars: [([Bar], [Bar])]):
-    data_rows = map(_bar_tuple_to_token_tuple, bars)
-    data_rows = filter(_filter_length, data_rows)
-    data_rows = map(_pad_tuples, data_rows)
-
-    # Construct dataset
-    ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
-        .cache() \
-        .shuffle(BUFFER_SIZE) \
-        .batch(BATCH_SIZE) \
-        .prefetch(tf.data.AUTOTUNE)
-
-    elem = next(iter(ds))
-    lead_seq, lead_dif, acmp_seq, acmp_dif = next(iter(elem))
-    print(lead_seq)
-    print(lead_dif)
 
 
 def _augment_bar(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
@@ -158,8 +155,6 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
 
     return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.float16), \
            tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.float16)
-    # return np.asarray(lead_seq, dtype=np.int16), np.asarray(lead_dif, dtype=np.float16), \
-    #        np.asarray(acmp_seq, dtype=np.int16), np.asarray(acmp_dif, dtype=np.float16)
 
 
 def _bars_to_tensor(bars: [Bar]):
@@ -227,12 +222,8 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
     return zipped_chunks
 
 
-def _filter_length(*args):
-    length = 0
-
-    for element in args:
-        length = max(length, len(element))
-
+def _filter_length(to_filter):
+    length = max([tf.shape(x)[0] for x in to_filter])
     return length <= SEQUENCE_MAX_LENGTH
 
 

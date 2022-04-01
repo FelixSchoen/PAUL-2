@@ -2,7 +2,7 @@ import os
 
 import tensorflow as tf
 
-from src.data_processing.data_pipeline import load_stored_bars, undefined
+from src.data_processing.data_pipeline import load_stored_bars, load_dataset
 from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -11,7 +11,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 def test_load_files():
     # store_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
-    undefined(bars)
+    load_dataset(bars)
 
 
 def test_asdf():
