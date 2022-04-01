@@ -7,11 +7,13 @@ import re
 from multiprocessing import Pool
 
 import mido
+import numpy as np
 import tensorflow as tf
-from pandas import DataFrame
 from sCoda import Composition, Bar
 
-from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_PATH, CONSECUTIVE_BAR_LENGTH
+from src.exception.exceptions import UnexpectedValueException
+from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_LENGTH, \
+    BUFFER_SIZE, BATCH_SIZE
 from src.util.util import chunks, flatten, file_exists
 
 
@@ -59,13 +61,35 @@ def store_midi_files(directory: str) -> None:
 
 
 def undefined(bars: [([Bar], [Bar])]):
-    lead_sequences = []
-    lead_difficulties = []
-    accompanying_sequences = []
-    accompanying_difficulties = []
+    lead_sequences = np.array([], dtype=np.int16)
+    lead_difficulties = np.array([], dtype=np.float16)
+    acmp_sequences = np.array([], dtype=np.int16)
+    acmp_difficulties = np.array([], dtype=np.float16)
 
     for entry in bars:
-        pass
+        lead_sequence, lead_difficulty = _bars_to_token(entry[0])
+        acmp_sequence, acmp_difficulty = _bars_to_tensor(entry[1])
+
+        # Filter long sequences
+        if max(len(lead_sequence), len(lead_difficulty), len(acmp_sequence),
+               len(acmp_difficulty)) <= SEQUENCE_MAX_LENGTH:
+            lead_sequences = np.append(lead_sequences, _pad_array(lead_sequence))
+            lead_difficulties = np.append(lead_difficulties, _pad_array(lead_difficulty))
+            acmp_sequences = np.append(acmp_sequences, _pad_array(acmp_sequence))
+            acmp_difficulties = np.append(acmp_difficulties, _pad_array(acmp_difficulty))
+
+    print(lead_sequences)
+    print(lead_difficulties)
+    print(acmp_sequences)
+    print(acmp_difficulties)
+
+    # Construct dataset
+    ds = tf.data.Dataset.from_tensor_slices((lead_sequences, lead_difficulties, acmp_sequences, acmp_difficulties))
+    ds.cache()
+    ds.shuffle(BUFFER_SIZE)
+    ds.batch(BATCH_SIZE)
+    ds.filter(filter_length)
+
     pass
 
 
@@ -84,24 +108,24 @@ def _augment_bar(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
 
     for transpose_by in range(-5, 7):
         lead_bars = []
-        accompanying_bars = []
+        acmp_bars = []
 
         # Copy the original bar in order to transpose it later on
         lead_unedited = [copy.copy(bar) for bar in base_bars[0]]
-        accompanying_unedited = [copy.copy(bar) for bar in base_bars[1]]
+        acmp_unedited = [copy.copy(bar) for bar in base_bars[1]]
 
         # Handle bars at the same time
-        for lead_bar, accompanying_bar in zip(lead_unedited, accompanying_unedited):
+        for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
             if lead_bar.transpose(transpose_by):
                 lead_bar.set_difficulty()
-            if accompanying_bar.transpose(transpose_by):
-                accompanying_bar.set_difficulty()
+            if acmp_bar.transpose(transpose_by):
+                acmp_bar.set_difficulty()
 
             # Append transposed bars to the placeholder objects
             lead_bars.append(lead_bar)
-            accompanying_bars.append(accompanying_bar)
+            acmp_bars.append(acmp_bar)
 
-        augmented_bars.append((lead_bars, accompanying_bars))
+        augmented_bars.append((lead_bars, acmp_bars))
 
     return augmented_bars
 
@@ -122,22 +146,74 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
     return bar_chunks
 
 
-def _dataframe_to_numeric_representation(data_frame: DataFrame):
+def _bars_to_token(bars: [Bar]):
+    sequence = np.array([])
+    difficulties = np.array([])
+
+    index = 0
+
+    for bar in bars:
+        data_frame = bar.to_relative_dataframe()
+
+        # Sanity check
+        assert len(data_frame) > 0
+
+        # Pandas dataframe to list of tokens
+        for k, row in data_frame.iterrows():
+            try:
+                token = Tokenizer.tokenize(row)
+                sequence = np.append(sequence, token)
+                difficulties = np.append(difficulties, bar.difficulty)
+            except UnexpectedValueException:
+                pass
+
+    # Add start and stop messages
+    sequence = np.insert(sequence, 0, -1)
+    difficulties = np.insert(difficulties, 0, -1)
+    sequence = np.append(sequence, -2)
+    difficulties = np.append(difficulties, -2)
+
+    return sequence, difficulties
+
+
+def _bars_to_tensor(bars: [Bar]):
     sequence = []
+    difficulties = []
 
-    # Pandas dataframe to list of tokens
-    for k, row in data_frame.iterrows():
-        token = Tokenizer.tokenize(row)
-        if token is not None and token > 0:
-            sequence.append(token)
+    for bar in bars:
+        data_frame = bar.to_relative_dataframe()
 
-    # Convert list to tensor
-    tensor = tf.convert_to_tensor(sequence, dtype="int16")
-    # Define how much to pad on each side
-    paddings = [[0, SEQUENCE_MAX_LENGTH - tf.shape(tensor)[0]]]
-    # Pad tensor
-    tensor = tf.pad(tensor, paddings, "CONSTANT", constant_values=0)
-    return tensor
+        # Sanity check
+        assert len(data_frame) > 0
+
+        # Pandas dataframe to list of tokens
+        for k, row in data_frame.iterrows():
+            try:
+                token = Tokenizer.tokenize(row)
+                sequence.append(token)
+                difficulties.append(bar.difficulty)
+            except UnexpectedValueException:
+                pass
+
+    # Add start and stop messages
+    sequence.insert(0, -1)
+    difficulties.insert(0, -1)
+    sequence.append(-2)
+    difficulties.append(-2)
+
+    # Convert lists to tensors
+    sequence_tensor = tf.convert_to_tensor(sequence, dtype="int16")
+    difficulties_tensor = tf.convert_to_tensor(difficulties, dtype="float16")
+
+    # Define paddings (how much to pad on each side)
+    padding_sequence = [[0, SEQUENCE_MAX_LENGTH - tf.shape(sequence_tensor)[0]]]
+    padding_difficulties = [[0, SEQUENCE_MAX_LENGTH - tf.shape(difficulties_tensor)[0]]]
+
+    # Pad tensors
+    sequence_tensor = tf.pad(sequence_tensor, padding_sequence, "CONSTANT", constant_values=0)
+    difficulties_tensor = tf.pad(difficulties_tensor, padding_difficulties, "CONSTANT", constant_values=0)
+
+    return sequence_tensor, difficulties_tensor
 
 
 def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]:
@@ -150,17 +226,17 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
 
     """
     lead_track = composition.tracks[0]
-    accompanying_track = composition.tracks[1]
+    acmp_track = composition.tracks[1]
 
     # Check that we start with the same number of bars
-    assert len(lead_track.bars) == len(accompanying_track.bars)
+    assert len(lead_track.bars) == len(acmp_track.bars)
 
     # Chunk the bars
     lead_chunked = list(chunks(lead_track.bars, CONSECUTIVE_BAR_LENGTH))
-    accompaniment_chunked = list(chunks(accompanying_track.bars, CONSECUTIVE_BAR_LENGTH))
+    acmp_chunked = list(chunks(acmp_track.bars, CONSECUTIVE_BAR_LENGTH))
 
     # Zip the chunked bars
-    zipped_chunks = list(zip(lead_chunked, accompaniment_chunked))
+    zipped_chunks = list(zip(lead_chunked, acmp_chunked))
 
     return zipped_chunks
 
@@ -186,7 +262,7 @@ def _store_midi_files(files) -> None:
 
     """
     for filepath, filename in files:
-        zip_file_path = DATA_COMPOSITIONS_PICKLE_OUTPUT_PATH.format(filename[:-4])
+        zip_file_path = DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH.format(filename[:-4])
 
         if file_exists(zip_file_path):
             logging.info(f"Skipping {filename}")
@@ -220,7 +296,7 @@ def _load_composition(file_path: str) -> Composition:
 
     """
     lead_tracks = []
-    accompanying_tracks = []
+    acmp_tracks = []
     meta_tracks = [0]
 
     # Open MIDI file
@@ -231,12 +307,12 @@ def _load_composition(file_path: str) -> Composition:
         if _find_word("right", track.name) is not None:
             lead_tracks.append(t)
         elif _find_word("left", track.name) is not None:
-            accompanying_tracks.append(t)
+            acmp_tracks.append(t)
         elif _find_word("pedal", track.name) is not None:
             meta_tracks.append(t)
 
     # Create composition from the found tracks
-    composition = Composition.from_file(file_path, [lead_tracks, accompanying_tracks], meta_tracks)
+    composition = Composition.from_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
 
     return composition
 
@@ -259,43 +335,54 @@ def _load_stored_bars(filepath_tuple) -> [([Bar], [Bar])]:
     return from_pickle
 
 
+def _pad_array(array, final_length: int = SEQUENCE_MAX_LENGTH) -> np.array:
+    if len(array) >= final_length:
+        return array
+    return np.pad(array, (0, SEQUENCE_MAX_LENGTH - array.shape[0]), "constant")
+
+
 # TODO Update
-def filter_length(src, trg):
-    len1 = tf.shape(src)[1] if src is not None else 0
-    len2 = tf.shape(trg)[2] if trg is not None else 0
-    maximum = tf.maximum(len1, len2)
-    return maximum < SEQUENCE_MAX_LENGTH
+def filter_length(*args):
+    length = 0
+
+    for i in range(0, len(args)):
+        print(tf.shape(args[i]))
+        # length = max(length, tf.shape(args[i])[] if args[i] is not None else 0)
+
+    # len1 = tf.shape(src)[1] if src is not None else 0
+    # len2 = tf.shape(trg)[2] if trg is not None else 0
+    # maximum = tf.maximum(len1, len2)
+    return length <= SEQUENCE_MAX_LENGTH
 
 
 class Tokenizer:
     """ Tokenizer for sequences.
 
     Ranges:
+    [-2]        ... stop
+    [-1]        ... start
     [0]         ... padding
-    [1]         ... start
-    [2]         ... stop
-    [3 - 26]    ... wait
-    [27 - 114]  ... note on
-    [115 - 202] ... note off
+    [1 - 24]    ... wait
+    [25 - 112]  ... note on
+    [113 - 200] ... note off
 
     """
 
     @staticmethod
     def tokenize(entry):
-        value = 0
         msg_type = entry["message_type"]
 
         if msg_type == "wait":
-            shifter = 3
+            shifter = 1
             value = int(entry["time"]) - 1
         elif msg_type == "note_on":
-            shifter = 3 + 24
+            shifter = 1 + 24
             value = int(entry["note"]) - 21
         elif msg_type == "note_off":
-            shifter = 3 + 24 + 88
+            shifter = 1 + 24 + 88
             value = int(entry["note"]) - 21
         else:
-            shifter = -1
+            raise UnexpectedValueException
 
         return shifter + value
 
@@ -303,11 +390,11 @@ class Tokenizer:
     def detokenize(token):
         if token <= 0:
             return None
-        elif 3 <= token <= 26:
+        elif 1 <= token <= 24:
             return {"message_type": "wait", "time": token}
-        elif 27 <= token <= 114:
-            return {"message_type": "note_on", "note": token - 27 + 21}
-        elif 115 <= token <= 202:
-            return {"message_type": "note_off", "note": token - 115 + 21}
+        elif 25 <= token <= 112:
+            return {"message_type": "note_on", "note": token - 25 + 21}
+        elif 113 <= token <= 200:
+            return {"message_type": "note_off", "note": token - 113 + 21}
         else:
-            assert False
+            raise UnexpectedValueException
