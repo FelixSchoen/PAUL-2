@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.network.masking import create_padding_mask, create_look_ahead_mask
+from src.network.masking import create_padding_mask, create_look_ahead_mask, create_mask
 from src.network.positional_encoding import positional_encoding
 
 
@@ -22,11 +22,11 @@ def test_positional_encoding():
 
 def test_padding_mask():
     x = tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]])
-    print(create_padding_mask(x))
+    create_padding_mask(x)
+    create_look_ahead_mask(5)
+    print(create_mask(x))
 
-    plt.matshow(create_look_ahead_mask(5))
-    print(create_look_ahead_mask(5))
-    plt.show()
+
 
 
 def test_stuff():
