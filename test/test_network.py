@@ -1,7 +1,7 @@
-import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
+from src.network.attention import scaled_dot_product_attention
 from src.network.masking import create_padding_mask, create_look_ahead_mask, create_mask
 from src.network.positional_encoding import positional_encoding
 
@@ -27,13 +27,28 @@ def test_padding_mask():
     print(create_mask(x))
 
 
+def test_attention():
+    print()
+    temp_k = tf.constant([[10, 0, 0],
+                          [0, 10, 0],
+                          [0, 0, 10],
+                          [0, 0, 10]], dtype=tf.float32)  # (4, 3)
+
+    temp_v = tf.constant([[1, 0],
+                          [10, 0],
+                          [100, 5],
+                          [1000, 6]], dtype=tf.float32)  # (4, 2)
+
+    # This `query` aligns with the second `key`,
+    # so the second `value` is returned.
+    temp_q = tf.constant([[0, 10, 0]], dtype=tf.float32)  # (1, 3)
+    print_attention(temp_q, temp_k, temp_v)
 
 
-def test_stuff():
-    asdf = np.array([1, 2, 3, 4])
-    asdf = asdf[np.newaxis, :]
-    print(asdf)
-    asdf = asdf[np.newaxis, :]
-    print(asdf)
-    asdf = asdf[np.newaxis, :]
-    print(asdf)
+def print_attention(q, k, v):
+    temp_out, temp_attn = scaled_dot_product_attention(
+        q, k, v, None)
+    print('Attention weights are:')
+    print(temp_attn)
+    print('Output is:')
+    print(temp_out)
