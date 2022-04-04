@@ -4,8 +4,35 @@ import tensorflow as tf
 from src.network.attention import scaled_dot_product_attention
 
 
+class EncoderLayer(tf.keras.layers.Layer):
+    def __init__(self, *, d_model, h, dff, rate=0.1):
+        super(EncoderLayer, self).__init__()
+
+        self.mha = MultiHeadAttention(d_model=d_model, h=h, use_bias=False)
+        self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
+
+        self.norm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.norm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
+
+    def call(self, x, training, mask):
+        # Multi Head Attention
+        attn_output, _ = self.mha(x, x, x, mask)  # Shape: batch_size, input_seq_len, d_model
+        attn_output = self.dropout1(attn_output, training=training)
+        out1 = self.norm1(x + attn_output)  # Shape: batch_size, input_seq_len, d_model
+
+        # Pointwise Feed Forward
+        pffn_output = self.pffn(out1)  # Shape: batch_size, input_seq_len, d_model
+        pffn_output = self.dropout2(pffn_output, training=training)
+        out2 = self.norm2(out1 + pffn_output)  # Shape: batch_size, input_seq_len, d_model
+
+        return out2
+
+
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h):
+    def __init__(self, *, d_model, h, use_bias=False):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
         self.h = h
@@ -14,10 +41,10 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         self.depth = d_model // self.h
 
-        self.wq = tf.keras.layers.Dense(d_model)
-        self.wk = tf.keras.layers.Dense(d_model)
-        self.wv = tf.keras.layers.Dense(d_model)
-        self.wo = tf.keras.layers.Dense(d_model)
+        self.wq = tf.keras.layers.Dense(d_model, use_bias=use_bias)
+        self.wk = tf.keras.layers.Dense(d_model, use_bias=use_bias)
+        self.wv = tf.keras.layers.Dense(d_model, use_bias=use_bias)
+        self.wo = tf.keras.layers.Dense(d_model, use_bias=use_bias)
 
     def split_heads(self, x):
         """ Splits the given tensor into `h` different parts, which can be attended to in parallel.
