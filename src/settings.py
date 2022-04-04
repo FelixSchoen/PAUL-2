@@ -15,3 +15,13 @@ CONSECUTIVE_BAR_LENGTH = 4
 
 BATCH_SIZE = 64
 BUFFER_SIZE = 20000
+# How often the encoder / decoder should be stacked
+NUM_LAYERS = 4
+# Number of attention heads
+NUM_HEADS = 8
+# Dimension of the model
+D_MODEL = 128
+# Dimension of the feed-forward network
+DFF = 512
+# Dropout rate applied after some operations
+DROPOUT_RATE = 0.1
