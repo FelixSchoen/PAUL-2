@@ -2,6 +2,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.network.attention import scaled_dot_product_attention
+from src.network.layers import MultiHeadAttention
 from src.network.masking import create_padding_mask, create_look_ahead_mask, create_mask
 from src.network.positional_encoding import positional_encoding
 
@@ -27,7 +28,7 @@ def test_padding_mask():
     print(create_mask(x))
 
 
-def test_attention():
+def test_dot_product_attention():
     print()
     temp_k = tf.constant([[10, 0, 0],
                           [0, 10, 0],
@@ -43,6 +44,13 @@ def test_attention():
     # so the second `value` is returned.
     temp_q = tf.constant([[0, 10, 0]], dtype=tf.float32)  # (1, 3)
     print_attention(temp_q, temp_k, temp_v)
+
+
+def test_multi_head_attention():
+    temp_mha = MultiHeadAttention(d_model=512, h=8)
+    y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
+    out, attn = temp_mha(y, k=y, q=y, mask=None)
+    print((out.shape, attn.shape))
 
 
 def print_attention(q, k, v):
