@@ -4,6 +4,45 @@ import tensorflow as tf
 from src.network.attention import scaled_dot_product_attention
 
 
+class DecoderLayer(tf.keras.layers.Layer):
+    def __init__(self, *, d_model, h, dff, rate=0.1):
+        super(DecoderLayer, self).__init__()
+
+        self.mha1 = MultiHeadAttention(d_model=d_model, h=h, use_bias=False)
+        self.mha2 = MultiHeadAttention(d_model=d_model, h=h, use_bias=False)
+
+        self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
+
+        self.norm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.norm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.norm3 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
+        self.dropout3 = tf.keras.layers.Dropout(rate)
+
+    def call(self, x, enc_output, training,
+             look_ahead_mask, padding_mask):
+        # Encoder Output Shape: batch_size, input_seq_len, d_model
+
+        # Calculate self attention
+        attn1, attn_weights_block1 = self.mha1(x, x, x, look_ahead_mask)
+        attn1 = self.dropout1(attn1, training=training)
+        out1 = self.norm1(attn1 + x)  # Shape: batch_size, input_seq_len, d_model
+
+        # Calculate attention over encoder output
+        attn2, attn_weights_block2 = self.mha2(enc_output, enc_output, out1, padding_mask)
+        attn2 = self.dropout2(attn2, training=training)
+        out2 = self.norm2(attn2 + out1)  # Shape: batch_size, input_seq_len, d_model
+
+        # Pointwise Feed Forward
+        pffn_output = self.pffn(out2)
+        pffn_output = self.dropout3(pffn_output, training=training)
+        out3 = self.norm3(pffn_output + out2)  # Shape: batch_size, input_seq_len, d_model
+
+        return out3, attn_weights_block1, attn_weights_block2
+
+
 class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, *, d_model, h, dff, rate=0.1):
         super(EncoderLayer, self).__init__()
