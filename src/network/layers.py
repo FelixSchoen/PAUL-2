@@ -70,3 +70,16 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         output = self.wo(concat_attention)  # Shape: batch_size, seq_len_q, d_model
 
         return output, attention_weights
+
+
+class PointwiseFeedForwardNetwork(tf.keras.layers.Layer):
+    def __init__(self, *, d_model, dff):
+        super(PointwiseFeedForwardNetwork, self).__init__()
+
+        self.layers = tf.keras.Sequential([
+            tf.keras.layers.Dense(dff, activation="relu"),
+            tf.keras.layers.Dense(d_model)
+        ])
+
+    def call(self, x):
+        return self.layers(x)

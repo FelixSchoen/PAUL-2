@@ -2,7 +2,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.network.attention import scaled_dot_product_attention
-from src.network.layers import MultiHeadAttention
+from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork
 from src.network.masking import create_padding_mask, create_look_ahead_mask, create_mask
 from src.network.positional_encoding import positional_encoding
 
@@ -51,6 +51,11 @@ def test_multi_head_attention():
     y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
     out, attn = temp_mha(y, k=y, q=y, mask=None)
     print((out.shape, attn.shape))
+
+
+def test_pointwise_feed_forward_network():
+    sample_ffn = PointwiseFeedForwardNetwork(d_model=512, dff=2048)
+    print(sample_ffn(tf.random.uniform((64, 50, 512))).shape)
 
 
 def print_attention(q, k, v):
