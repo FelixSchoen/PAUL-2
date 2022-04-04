@@ -20,11 +20,11 @@ def get_angles(pos, i, d_model):
     return pos * angle
 
 
-def positional_encoding(position, d_model, dim=3):
+def positional_encoding(max_position, d_model, dim=3):
     """ Calculates the positional encoding for all combinations of `(position, d_model)`.
 
     Args:
-        position: Maximum position of the model
+        max_position: Maximum position of the model
         d_model: Dimension of the model
         dim: Desired dimension of the output tensor
 
@@ -33,7 +33,7 @@ def positional_encoding(position, d_model, dim=3):
 
     """
     # Get angles for entire range of position and d_model
-    angle_rads = get_angles(np.arange(position)[:, np.newaxis],
+    angle_rads = get_angles(np.arange(max_position)[:, np.newaxis],
                             np.arange(d_model)[np.newaxis, :],
                             d_model)
 
