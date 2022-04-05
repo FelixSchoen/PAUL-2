@@ -98,7 +98,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         x = tf.reshape(x, (*x.shape[:-1], self.h, self.depth))
 
         # Setup indices for transposition
-        last_dimension_index = tf.rank(x) - 1
+        last_dimension_index = len(x.shape) - 1
         prior_dimension_indices = np.arange(0, last_dimension_index + 1)
 
         # Transpose to Shape: ..., h, L, depth
@@ -122,7 +122,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
 
         # Undo previous transposition
-        last_dimension_index = tf.rank(scaled_attention) - 1
+        last_dimension_index = len(scaled_attention.shape) - 1
         prior_dimension_indices = np.arange(0, last_dimension_index + 1)
         scaled_attention = tf.transpose(scaled_attention, perm=[*prior_dimension_indices[:-3],
                                                                 last_dimension_index - 1,

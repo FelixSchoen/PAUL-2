@@ -143,7 +143,7 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
                 try:
                     token = Tokenizer.tokenize(row)
                     seq.append(token)
-                    dif.append(bar.difficulty)
+                    dif.append(int(bar.difficulty * 1000))
                 except UnexpectedValueException:
                     pass
 
@@ -153,8 +153,8 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
         seq.append(-2)
         dif.append(-2)
 
-    return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.float16), \
-           tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.float16)
+    return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.int16), \
+           tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.int16)
 
 
 def _bars_to_tensor(bars: [Bar]):

@@ -11,7 +11,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 def test_load_files():
     # store_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
-    load_dataset(bars)
+    ds = load_dataset(bars)
+
+    for batch in ds.as_numpy_iterator():
+        for entry in batch:
+            print("New Entry")
+            a, b, c, d = entry
+            print(a)
+            break
+        break
 
 
 def test_asdf():

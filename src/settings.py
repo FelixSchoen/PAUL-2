@@ -4,6 +4,8 @@ DATA_MIDI_INPUT_PATH = "D:/Drive/Documents/University/Master/4. Semester/Diploma
 DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH = "D:/Documents/Coding/Repository/Badura/out/pickle/compositions"
 DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH = DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH + "/{0}.zip"
 
+PATH_CHECKPOINT_LEAD = "D:/Documents/Coding/Repository/Badura/out/badura/checkpoint"
+
 # Length of tensors representing sequences
 SEQUENCE_MAX_LENGTH = 512
 # How many adjacent bars to consolidate into a tensor
@@ -25,3 +27,6 @@ D_MODEL = 128
 DFF = 512
 # Dropout rate applied after some operations
 DROPOUT_RATE = 0.1
+
+INPUT_VOCAB_SIZE = 1000 + 2
+OUTPUT_VOCAB_SIZE = 200 + 2
