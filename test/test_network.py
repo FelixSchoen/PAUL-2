@@ -4,8 +4,10 @@ from matplotlib import pyplot as plt
 from src.network.attention import scaled_dot_product_attention
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_look_ahead_mask, create_combined_mask
+from src.network.optimization import TransformerSchedule
 from src.network.positional_encoding import positional_encoding
 from src.network.transformer import Decoder, Encoder, Transformer
+from src.settings import D_MODEL
 
 
 def test_positional_encoding():
@@ -114,6 +116,15 @@ def test_transformer():
     fn_out, _ = sample_transformer([temp_input, temp_target], training=False)
 
     print(fn_out.shape)  # (batch_size, tar_seq_len, target_vocab_size)
+
+
+def test_learning_schedule():
+    temp_learning_rate_schedule = TransformerSchedule(D_MODEL)
+
+    plt.plot(temp_learning_rate_schedule(tf.range(40000, dtype=tf.float32)))
+    plt.ylabel('Learning Rate')
+    plt.xlabel('Train Step')
+    plt.show()
 
 
 def print_attention(q, k, v):
