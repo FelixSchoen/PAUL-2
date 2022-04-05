@@ -3,7 +3,8 @@ import time
 import tensorflow as tf
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset
-from src.network.optimization import TransformerSchedule, loss_function, accuracy_function
+from src.network.optimization import TransformerSchedule
+from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE, OUTPUT_VOCAB_SIZE, DROPOUT_RATE, \
     DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, PATH_CHECKPOINT_LEAD
@@ -62,7 +63,9 @@ def test_transformer():
             lead_seq = tf.stack(lead_seqs)
             acmp_seq = tf.stack(acmp_seqs)
 
-            train_step(transformer, optimizer, train_loss, train_accuracy, lead_seq, acmp_seq)
+            trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, signature)
+
+            trainer(lead_seq, acmp_seq)
 
             if batch_num % 50 == 0:
                 print(
@@ -77,24 +80,7 @@ def test_transformer():
             print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
 
 
-train_step_signature = [
+signature = [
     tf.TensorSpec(shape=(None, None), dtype=tf.int64),
     tf.TensorSpec(shape=(None, None), dtype=tf.int64),
 ]
-
-
-@tf.function
-# (input_signature=train_step_signature)
-def train_step(transformer, optimizer, train_loss, train_accuracy, inp, tar):
-    tar_inp = tar[:, :-1]
-    tar_real = tar[:, 1:]
-
-    with tf.GradientTape() as tape:
-        predictions, _ = transformer([inp, tar_inp], training=True)
-        loss = loss_function(tar_real, predictions)
-
-    gradients = tape.gradient(loss, transformer.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
-
-    train_loss(loss)
-    train_accuracy(accuracy_function(tar_real, predictions))
