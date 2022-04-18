@@ -1,15 +1,17 @@
 import numpy as np
 import tensorflow as tf
 
-from src.network.attention import scaled_dot_product_attention
+from src.exception.exceptions import UnexpectedValueException
+from src.network.attention import scaled_dot_product_attention, relative_scaled_dot_product_attention
+from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class DecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, dff, rate=0.1):
+    def __init__(self, *, d_model, h, dff, rate=0.1, attention_type="standard"):
         super(DecoderLayer, self).__init__()
 
-        self.mha1 = MultiHeadAttention(d_model=d_model, h=h, use_bias=False)
-        self.mha2 = MultiHeadAttention(d_model=d_model, h=h, use_bias=False)
+        self.mha1 = MultiHeadAttention(d_model=d_model, h=h, use_bias=False, attention_type=attention_type)
+        self.mha2 = MultiHeadAttention(d_model=d_model, h=h, use_bias=False, attention_type=attention_type)
 
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
 
@@ -44,10 +46,10 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, dff, rate=0.1):
+    def __init__(self, *, d_model, h, dff, rate=0.1, attention_type="standard"):
         super(EncoderLayer, self).__init__()
 
-        self.mha = MultiHeadAttention(d_model=d_model, h=h, use_bias=False)
+        self.mha = MultiHeadAttention(d_model=d_model, h=h, use_bias=False, attention_type=attention_type)
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
 
         self.norm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
@@ -71,10 +73,12 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, use_bias=False):
+    def __init__(self, *, d_model, h, use_bias=False, attention_type="standard", max_rel_dist=SEQUENCE_MAX_LENGTH):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
         self.h = h
+        self.attention_type = attention_type
+        self.max_len = max_rel_dist
 
         assert d_model % self.h == 0
 
@@ -84,6 +88,9 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.wk = tf.keras.layers.Dense(d_model, use_bias=use_bias)
         self.wv = tf.keras.layers.Dense(d_model, use_bias=use_bias)
         self.wo = tf.keras.layers.Dense(d_model, use_bias=use_bias)
+
+        # For relative position embedding
+        self.E = tf.keras.layers.Embedding(self.max_len, self.d_model)
 
     def split_heads(self, x):
         """ Splits the given tensor into `h` different parts, which can be attended to in parallel.
@@ -105,6 +112,35 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         return tf.transpose(x, perm=[*prior_dimension_indices[:-3], last_dimension_index - 1, last_dimension_index - 2,
                                      last_dimension_index])
 
+    @staticmethod
+    def get_position_embeddings(E, seq_len, max_len=None):
+        """ Builds the position embeddings for relative attention.
+
+        Args:
+            E: An embedding layer
+            seq_len: Length of the current sequence
+            max_len: Maximum distances to consider
+
+        Returns: The embeddings
+
+        """
+        if not E.built:
+            E.build(seq_len)
+
+        if max_len is None:
+            max_len = E.embeddings.get_shape()[0]
+
+        # Sequence is not longer than max_sequence, can fit entirely
+        if max_len >= seq_len:
+            return E(np.arange(max_len - seq_len, max_len))
+
+        # For sequences that are too long, simply assume maximum distance
+        return tf.concat(
+            values=[*[E(np.arange(0, 1)) for _ in range(seq_len - max_len)],
+                    E(np.arange(0, max_len))],
+            axis=0
+        )
+
     def call(self, v, k, q, mask):
         # Pipe Q, K, V through the dense layer, adds dimension d_model at the end
         q = self.wq(q)
@@ -116,13 +152,20 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         k = self.split_heads(k)
         v = self.split_heads(v)
 
-        batch_size = tf.shape(q)[0]
-
-        # Apply dot product attention
-        scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+        if self.attention_type == "standard":
+            # Apply dot product attention
+            scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+        elif self.attention_type == "relative":
+            seq_len_k = k.shape[-2]
+            e = self.get_position_embeddings(self.E, seq_len_k, self.max_len)  # Shape: (seq_len_k, d_model)
+            e = self.split_heads(e)
+            scaled_attention, attention_weights = relative_scaled_dot_product_attention(q, k, v, e, mask=mask)
+        else:
+            raise UnexpectedValueException("Unknown attention type")
 
         # Undo previous transposition
-        last_dimension_index = len(scaled_attention.shape) - 1  # Note: Needs len() to work, does not work with shape()
+        last_dimension_index = len(
+            scaled_attention.shape) - 1  # Note: Needs len() to work, does not work with shape() TODO: Try rank
         prior_dimension_indices = np.arange(0, last_dimension_index + 1)
         scaled_attention = tf.transpose(scaled_attention, perm=[*prior_dimension_indices[:-3],
                                                                 last_dimension_index - 1,

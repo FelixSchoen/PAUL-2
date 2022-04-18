@@ -20,7 +20,8 @@ def test_transformer():
         dff=DFF,
         input_vocab_size=INPUT_VOCAB_SIZE,
         target_vocab_size=OUTPUT_VOCAB_SIZE,
-        rate=DROPOUT_RATE)
+        rate=DROPOUT_RATE,
+        attention_type="relative")
 
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
     ds = load_dataset(bars)

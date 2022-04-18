@@ -7,7 +7,7 @@ from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class Decoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, target_vocab_size, rate=0.1):
+    def __init__(self, *, num_layers, d_model, h, dff, target_vocab_size, rate=0.1, attention_type="standard"):
         super(Decoder, self).__init__()
 
         self.d_model = d_model
@@ -16,7 +16,7 @@ class Decoder(tf.keras.layers.Layer):
         self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, d_model)
 
-        self.dec_layers = [DecoderLayer(d_model=d_model, h=h, dff=dff, rate=rate)
+        self.dec_layers = [DecoderLayer(d_model=d_model, h=h, dff=dff, rate=rate, attention_type=attention_type)
                            for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
@@ -43,7 +43,7 @@ class Decoder(tf.keras.layers.Layer):
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, rate=0.1):
+    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, rate=0.1, attention_type="standard"):
         super(Encoder, self).__init__()
 
         self.d_model = d_model
@@ -52,7 +52,7 @@ class Encoder(tf.keras.layers.Layer):
         self.embedding = tf.keras.layers.Embedding(input_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, self.d_model)
 
-        self.enc_layers = [EncoderLayer(d_model=d_model, h=h, dff=dff, rate=rate)
+        self.enc_layers = [EncoderLayer(d_model=d_model, h=h, dff=dff, rate=rate, attention_type=attention_type)
                            for _ in range(num_layers)]
 
         self.dropout = tf.keras.layers.Dropout(rate)
@@ -75,15 +75,16 @@ class Encoder(tf.keras.layers.Layer):
 
 
 class Transformer(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, target_vocab_size, rate=0.1):
+    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, target_vocab_size, rate=0.1,
+                 attention_type="standard"):
         super().__init__()
 
         # Setup Encoder and Decoder
         self.encoder = Encoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff,
-                               input_vocab_size=input_vocab_size, rate=rate)
+                               input_vocab_size=input_vocab_size, rate=rate, attention_type=attention_type)
 
         self.decoder = Decoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff,
-                               target_vocab_size=target_vocab_size, rate=rate)
+                               target_vocab_size=target_vocab_size, rate=rate, attention_type=attention_type)
 
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 

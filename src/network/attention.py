@@ -37,6 +37,20 @@ def scaled_dot_product_attention(q, k, v, mask):
 
 
 def relative_scaled_dot_product_attention(q, k, v, e, mask):
+    """ Calculates the relative attention weights for the queries, keys and values.
+
+    Input consists of queries and keys of dimension `d_k`, values of dimension `d_v`.
+
+    Args:
+        q: Queries
+        k: Keys
+        v: Values
+        e: Position embedding matrix
+        mask: Mask that will be applied to the product of q and k
+
+    Returns: The calculated attention weights
+
+    """
     matmul_qk = tf.matmul(q, k, transpose_b=True)  # Shape: (..., seq_len_q, seq_len_k)
     s_rel = skew(tf.matmul(q, e, transpose_b=True))  # Shape: (..., seq_len_q, seq_len_k)
 

@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
@@ -54,6 +55,17 @@ def test_multi_head_attention():
     y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
     out, attn = temp_mha(y, k=y, q=y, mask=None)
     print((out.shape, attn.shape))
+
+
+def test_mha_relative():
+    # Create a MultiHeadAttention Block to test
+    t = tf.random.uniform((10, 1500, 256))
+    mha = MultiHeadAttention(d_model=256, h=8, use_bias=True, attention_type="relative")
+    out, attn = mha(t, t, t, create_combined_mask(tf.random.uniform((10, 1500))))
+
+    print(f"Shape of the output: {out.shape}")
+    print(f"Shape of the attention weights: {attn.shape}")
+    print(f"Number of trainable variables in the MHA block: {len(mha.trainable_variables)}")
 
 
 def test_pointwise_feed_forward_network():
@@ -161,6 +173,13 @@ def test_relative_attention():
     print(attn_weights)
     print("Output Attention is,")
     print(attn)
+
+
+def test_get_embeddings():
+    # test
+    E = tf.keras.layers.Embedding(400, 200)
+    print(MultiHeadAttention.get_position_embeddings(E, 500, max_len=400).shape)
+    print(np.arange(0, 1))
 
 
 def print_attention(q, k, v):
