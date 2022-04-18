@@ -81,28 +81,6 @@ def test_transformer():
         print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
 
 
-def test_skew():
-    # example
-    u = tf.constant([[0, 1, 1, 0, 2],
-                     [1, 0, 0, 3, 2],
-                     [1, 1, 5, 3, 2],
-                     [0, 7, 5, 3, 2],
-                     [9, 7, 5, 3, 2]], dtype=tf.float32)
-    plots = [u, skew(u)]
-    fig = plt.figure(figsize=(10, 6.5))
-    rows = 1
-    cols = 2
-    labels = ['u', 'skew(u)']
-    fig.suptitle("Columns from the right are skewed into diagonals on and under the main, and elements\n" \
-                 "not in these columns are thrown into the upper triangle and/or replaced by zeros", \
-                 fontsize=15)
-    for i in range(rows * cols):
-        fig.add_subplot(1, 2, i + 1).set_title(labels[i], fontsize=14)
-        plt.imshow(plots[i][0], cmap='viridis')
-    fig.tight_layout()
-    plt.show()
-
-
 @tf.function
 def train_step(transformer, optimizer, train_loss, train_accuracy, inp, tar):
     tar_inp = tar[:, :-1]

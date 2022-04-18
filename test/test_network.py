@@ -1,7 +1,7 @@
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.network.attention import scaled_dot_product_attention
+from src.network.attention import scaled_dot_product_attention, skew, relative_scaled_dot_product_attention
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_look_ahead_mask, create_combined_mask
 from src.network.optimization import TransformerSchedule
@@ -125,6 +125,42 @@ def test_learning_schedule():
     plt.ylabel('Learning Rate')
     plt.xlabel('Train Step')
     plt.show()
+
+
+def test_skew():
+    # example
+    u = tf.constant([[0, 1, 1, 0, 2],
+                     [1, 0, 0, 3, 2],
+                     [1, 1, 5, 3, 2],
+                     [0, 7, 5, 3, 2],
+                     [9, 7, 5, 3, 2]], dtype=tf.float32)
+    plots = [u, skew(u)]
+    fig = plt.figure(figsize=(10, 6.5))
+    rows = 1
+    cols = 2
+    labels = ['u', 'skew(u)']
+    fig.suptitle("Columns from the right are skewed into diagonals on and under the main, and elements\n" \
+                 "not in these columns are thrown into the upper triangle and/or replaced by zeros", \
+                 fontsize=15)
+    for i in range(rows * cols):
+        fig.add_subplot(1, 2, i + 1).set_title(labels[i], fontsize=14)
+        plt.imshow(plots[i][0], cmap='viridis')
+    fig.tight_layout()
+    plt.show()
+
+
+def test_relative_attention():
+    # examples of attention
+    temp_k = tf.constant([[0, 0, 10], [0, 10, 0], [10, 0, 0], [10, 0, 0]], dtype=tf.float32)
+    temp_v = tf.constant([[4, 2, 1], [5, 6, 3], [7, 8, 10], [9, 12, 45]], dtype=tf.float32)
+    temp_e = tf.zeros_like(temp_k)  # zero the relative position embeddings to demonstrate original attention
+
+    temp_q = tf.constant([[0, 10, 0]], dtype=tf.float32)
+    attn, attn_weights = relative_scaled_dot_product_attention(temp_q, temp_k, temp_v, temp_e, None)
+    print("Attention weights are,")
+    print(attn_weights)
+    print("Output Attention is,")
+    print(attn)
 
 
 def print_attention(q, k, v):
