@@ -51,3 +51,15 @@ def scaled_dot_product_attention(q, k, v, mask):
     output = tf.matmul(attention_weights, v)  # (..., seq_len_q, depth_v)
 
     return output, attention_weights
+
+
+def skew(t: tf.Tensor):
+    # Pad input tensor, add no paddings for other than last dimension
+    not_padded_dimensions = [[0, 0] for _ in range(len(t.shape) - 1)]
+    padded = tf.pad(t, [*not_padded_dimensions, [1, 0]])
+
+    # Reshape
+    s_rel = tf.reshape(padded, (-1, padded.shape[-1], padded.shape[-2]))
+    # Slice
+    s_rel = s_rel[:, 1:]
+    return tf.cast(tf.reshape(s_rel, t.shape), t.dtype)

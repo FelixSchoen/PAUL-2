@@ -1,8 +1,10 @@
 import time
 
 import tensorflow as tf
+from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset
+from src.network.attention import skew
 from src.network.optimization import TransformerSchedule, loss_function, accuracy_function
 from src.network.training import Trainer
 from src.network.transformer import Transformer
@@ -51,7 +53,6 @@ def test_transformer():
         train_loss.reset_states()
         train_accuracy.reset_states()
 
-        # inp -> portuguese, tar -> english
         for (batch_num, entry) in enumerate(ds.as_numpy_iterator()):
             lead_seqs, lead_difs, acmp_seqs, acmp_difs = [], [], [], []
             for lead_seq, lead_dif, acmp_seq, acmp_dif in entry:
@@ -78,6 +79,28 @@ def test_transformer():
         print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
         print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
+
+
+def test_skew():
+    # example
+    u = tf.constant([[0, 1, 1, 0, 2],
+                     [1, 0, 0, 3, 2],
+                     [1, 1, 5, 3, 2],
+                     [0, 7, 5, 3, 2],
+                     [9, 7, 5, 3, 2]], dtype=tf.float32)
+    plots = [u, skew(u)]
+    fig = plt.figure(figsize=(10, 6.5))
+    rows = 1
+    cols = 2
+    labels = ['u', 'skew(u)']
+    fig.suptitle("Columns from the right are skewed into diagonals on and under the main, and elements\n" \
+                 "not in these columns are thrown into the upper triangle and/or replaced by zeros", \
+                 fontsize=15)
+    for i in range(rows * cols):
+        fig.add_subplot(1, 2, i + 1).set_title(labels[i], fontsize=14)
+        plt.imshow(plots[i][0], cmap='viridis')
+    fig.tight_layout()
+    plt.show()
 
 
 @tf.function
