@@ -9,7 +9,10 @@ PATH_CHECKPOINT_LEAD = "D:/Documents/Coding/Repository/Badura/out/badura/checkpo
 # Length of tensors representing sequences
 SEQUENCE_MAX_LENGTH = 512
 # How many adjacent bars to consolidate into a tensor
-CONSECUTIVE_BAR_LENGTH = 4
+CONSECUTIVE_BAR_MAX_LENGTH = 4
+# Which time signatures to use
+VALID_TIME_SIGNATURES = [(2, 2), (2, 4), (3, 4), (4, 4), (5, 4), (6, 4), (9, 4), (3, 8), (4, 8), (5, 8), (6, 8), (7, 8),
+                         (8, 8), (9, 8), (12, 8), ]
 
 # ==================
 # === Parameters ===
