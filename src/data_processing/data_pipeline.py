@@ -140,6 +140,8 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
 def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
     lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
 
+    asdf_data = []
+
     for i, (seq, dif) in enumerate([(lead_seq, lead_dif), (acmp_seq, acmp_dif)]):
         for bar in bars[i]:
             data_frame = bar.to_relative_dataframe()
@@ -153,23 +155,39 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
             for _, row in data_frame.iterrows():
                 try:
                     tokens = tokenizer.tokenize(row)
-                    if tokens is not None:
-                        seq.extend(tokens)
-                        dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
+                    seq.extend(tokens)
+                    dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
+                    asdf_data.append({"message_type": row["message_type"]})
                 except UnexpectedValueException:
                     pass
 
             # Append trailing wait messages
-            if tokenizer.wait_buffer > 0:
-                tokens = Tokenizer.generate_trailing_wait(tokenizer.wait_buffer)
-                seq.extend(tokens)
-                dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
+            tokens = tokenizer.flush_wait_buffer()
+            seq.extend(tokens)
+            dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
 
         # Add start and stop messages
         seq.insert(0, -1)
         dif.insert(0, -1)
         seq.append(-2)
         dif.append(-2)
+
+        # TODO Testing
+        break
+
+    detokenizer = Detokenizer()
+    data = []
+
+    for token in lead_seq:
+        data.extend(detokenizer.detokenize(token))
+    data.extend(detokenizer.flush_wait_buffer())
+
+    print("Initial")
+    print(asdf_data)
+    print("Tokenized")
+    print(lead_seq)
+    print("Detokenized")
+    print(data)
 
     return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.int16), \
            tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.int16)
@@ -385,7 +403,7 @@ class Tokenizer:
             shifter = 1
             value = int(entry["time"]) - 1
             self.wait_buffer += shifter + value
-            return
+            return []
         elif msg_type == "note_on":
             shifter = 1 + 24
             value = int(entry["note"]) - 21
@@ -399,15 +417,18 @@ class Tokenizer:
         else:
             raise UnexpectedValueException
 
-        tokens = Tokenizer.generate_trailing_wait(self.wait_buffer)
-        self.wait_buffer = 0
-
+        tokens = self.flush_wait_buffer()
         tokens.append(shifter + value)
 
         return tokens
 
+    def flush_wait_buffer(self):
+        tokens = Tokenizer._flush_wait_buffer(self.wait_buffer)
+        self.wait_buffer = 0
+        return tokens
+
     @staticmethod
-    def generate_trailing_wait(wait_buffer):
+    def _flush_wait_buffer(wait_buffer):
         tokens = []
 
         while wait_buffer > 24:
@@ -419,17 +440,48 @@ class Tokenizer:
 
         return tokens
 
+
+class Detokenizer:
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.wait_buffer = 0
+
     def detokenize(self, token):
         if token <= 0:
-            return None
+            return []
         elif 1 <= token <= 24:
-            return {"message_type": "wait", "time": token}
+            self.wait_buffer += token - 1 + 1
+            return []
         elif 25 <= token <= 112:
-            return {"message_type": "note_on", "note": token - 25 + 21}
+            entry = {"message_type": "note_on", "note": token - 25 + 21}
         elif 113 <= token <= 200:
-            return {"message_type": "note_off", "note": token - 113 + 21}
+            entry = {"message_type": "note_off", "note": token - 113 + 21}
         elif 201 <= token <= 215:
             signature = VALID_TIME_SIGNATURES[token - 201]
-            return {"message_type": "time_signature", "numerator": signature[0], "denominator": signature[1]}
+            entry = {"message_type": "time_signature", "numerator": signature[0], "denominator": signature[1]}
         else:
             raise UnexpectedValueException
+
+        entries = self.flush_wait_buffer()
+        entries.append(entry)
+
+        return entries
+
+    def flush_wait_buffer(self):
+        tokens = Detokenizer._flush_wait_buffer(self.wait_buffer)
+        self.wait_buffer = 0
+        return tokens
+
+    @staticmethod
+    def _flush_wait_buffer(wait_buffer):
+        entries = []
+
+        while wait_buffer > 24:
+            entries.append({"message_type": "wait", "time": 24})
+            wait_buffer -= 24
+
+        if wait_buffer > 0:
+            entries.append({"message_type": "wait", "time": wait_buffer})
+
+        return entries

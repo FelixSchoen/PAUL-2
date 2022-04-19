@@ -12,13 +12,13 @@ def test_load_files():
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
     ds = load_dataset(bars)
 
-    for batch in ds.as_numpy_iterator():
-        for entry in batch:
-            print("New Entry")
-            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
-            print(lead_msg)
-            break
-        break
+    # for batch in ds.as_numpy_iterator():
+    #     for entry in batch:
+    #         print("New Entry")
+    #         lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+    #         print(lead_msg)
+    #         break
+    #     break
 
 
 def test_asdf():
