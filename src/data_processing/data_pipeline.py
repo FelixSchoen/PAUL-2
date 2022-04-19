@@ -140,8 +140,6 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
 def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
     lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
 
-    asdf_data = []
-
     for i, (seq, dif) in enumerate([(lead_seq, lead_dif), (acmp_seq, acmp_dif)]):
         for bar in bars[i]:
             data_frame = bar.to_relative_dataframe()
@@ -157,7 +155,6 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
                     tokens = tokenizer.tokenize(row)
                     seq.extend(tokens)
                     dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
-                    asdf_data.append({"message_type": row["message_type"]})
                 except UnexpectedValueException:
                     pass
 
@@ -171,23 +168,6 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
         dif.insert(0, -1)
         seq.append(-2)
         dif.append(-2)
-
-        # TODO Testing
-        break
-
-    detokenizer = Detokenizer()
-    data = []
-
-    for token in lead_seq:
-        data.extend(detokenizer.detokenize(token))
-    data.extend(detokenizer.flush_wait_buffer())
-
-    print("Initial")
-    print(asdf_data)
-    print("Tokenized")
-    print(lead_seq)
-    print("Detokenized")
-    print(data)
 
     return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.int16), \
            tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.int16)
