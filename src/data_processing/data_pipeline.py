@@ -13,7 +13,7 @@ from sCoda import Composition, Bar
 
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE
 from src.util.util import chunks, flatten, file_exists
 
 
@@ -147,14 +147,23 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
             # Sanity check
             assert len(data_frame) > 0
 
+            tokenizer = Tokenizer()
+
             # Pandas dataframe to list of tokens
             for _, row in data_frame.iterrows():
                 try:
-                    token = Tokenizer.tokenize(row)
-                    seq.append(token)
-                    dif.append(int(bar.difficulty * 1000))
+                    tokens = tokenizer.tokenize(row)
+                    if tokens is not None:
+                        seq.extend(tokens)
+                        dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
                 except UnexpectedValueException:
                     pass
+
+            # Append trailing wait messages
+            if tokenizer.wait_buffer > 0:
+                tokens = Tokenizer.generate_trailing_wait(tokenizer.wait_buffer)
+                seq.extend(tokens)
+                dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
 
         # Add start and stop messages
         seq.insert(0, -1)
@@ -164,46 +173,6 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
 
     return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.int16), \
            tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.int16)
-
-
-def _bars_to_tensor(bars: [Bar]):
-    sequence = []
-    difficulties = []
-
-    for bar in bars:
-        data_frame = bar.to_relative_dataframe()
-
-        # Sanity check
-        assert len(data_frame) > 0
-
-        # Pandas dataframe to list of tokens
-        for k, row in data_frame.iterrows():
-            try:
-                token = Tokenizer.tokenize(row)
-                sequence.append(token)
-                difficulties.append(bar.difficulty)
-            except UnexpectedValueException:
-                pass
-
-    # Add start and stop messages
-    sequence.insert(0, -1)
-    difficulties.insert(0, -1)
-    sequence.append(-2)
-    difficulties.append(-2)
-
-    # Convert lists to tensors
-    sequence_tensor = tf.convert_to_tensor(sequence, dtype="int16")
-    difficulties_tensor = tf.convert_to_tensor(difficulties, dtype="float16")
-
-    # Define paddings (how much to pad on each side)
-    padding_sequence = [[0, SEQUENCE_MAX_LENGTH - tf.shape(sequence_tensor)[0]]]
-    padding_difficulties = [[0, SEQUENCE_MAX_LENGTH - tf.shape(difficulties_tensor)[0]]]
-
-    # Pad tensors
-    sequence_tensor = tf.pad(sequence_tensor, padding_sequence, "CONSTANT", constant_values=0)
-    difficulties_tensor = tf.pad(difficulties_tensor, padding_difficulties, "CONSTANT", constant_values=0)
-
-    return sequence_tensor, difficulties_tensor
 
 
 def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]:
@@ -405,13 +374,18 @@ class Tokenizer:
 
     """
 
-    @staticmethod
-    def tokenize(entry):
+    def __init__(self) -> None:
+        super().__init__()
+        self.wait_buffer = 0
+
+    def tokenize(self, entry):
         msg_type = entry["message_type"]
 
         if msg_type == "wait":
             shifter = 1
             value = int(entry["time"]) - 1
+            self.wait_buffer += shifter + value
+            return
         elif msg_type == "note_on":
             shifter = 1 + 24
             value = int(entry["note"]) - 21
@@ -425,10 +399,27 @@ class Tokenizer:
         else:
             raise UnexpectedValueException
 
-        return shifter + value
+        tokens = Tokenizer.generate_trailing_wait(self.wait_buffer)
+        self.wait_buffer = 0
+
+        tokens.append(shifter + value)
+
+        return tokens
 
     @staticmethod
-    def detokenize(token):
+    def generate_trailing_wait(wait_buffer):
+        tokens = []
+
+        while wait_buffer > 24:
+            tokens.append(1 + (24 - 1))
+            wait_buffer -= 24
+
+        if wait_buffer > 0:
+            tokens.append(1 + (wait_buffer - 1))
+
+        return tokens
+
+    def detokenize(self, token):
         if token <= 0:
             return None
         elif 1 <= token <= 24:
