@@ -1,4 +1,11 @@
+from enum import Enum
+
 import tensorflow as tf
+
+
+class MaskType(Enum):
+    padding = "padding"
+    lookahead = "lookahead"
 
 
 def create_padding_mask(seq, dim=4):

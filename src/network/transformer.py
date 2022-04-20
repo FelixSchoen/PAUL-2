@@ -81,14 +81,14 @@ class Encoder(tf.keras.layers.Layer):
 
 
 class Transformer(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, h, dff, num_encoders, input_vocab_size, target_vocab_size, rate=0.1,
+    def __init__(self, *, num_layers, d_model, h, dff, num_encoders, input_vocab_sizes, target_vocab_size, rate=0.1,
                  attention_type=AttentionType.standard):
         super().__init__()
 
         # Setup Encoder and Decoder
         self.encoders = [
-            Encoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, input_vocab_size=input_vocab_size, rate=rate,
-                    attention_type=attention_type) for _ in range(num_encoders)]
+            Encoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, input_vocab_size=input_vocab_sizes[i], rate=rate,
+                    attention_type=attention_type) for i in range(num_encoders)]
 
         self.decoder = Decoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, num_encoders=num_encoders,
                                target_vocab_size=target_vocab_size, rate=rate, attention_type=attention_type)

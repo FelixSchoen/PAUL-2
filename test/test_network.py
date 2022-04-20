@@ -120,7 +120,7 @@ def test_decoder():
 def test_transformer():
     sample_transformer = Transformer(
         num_layers=2, d_model=512, h=8, dff=2048,
-        input_vocab_size=8500, target_vocab_size=8000)
+        input_vocab_sizes=8500, target_vocab_size=8000)
 
     temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
     temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
@@ -189,3 +189,10 @@ def print_attention(q, k, v):
     print(temp_attn)
     print('Output is:')
     print(temp_out)
+
+
+def test_slice():
+    rank_2_tensor = tf.constant([512],[512],[512], dtype=tf.float16)
+    print(tf.shape(rank_2_tensor))
+    print(rank_2_tensor)
+    print(rank_2_tensor[:, :1])

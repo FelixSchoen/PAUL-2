@@ -15,6 +15,11 @@ VALID_TIME_SIGNATURES = [(2, 2), (2, 4), (3, 4), (4, 4), (5, 4), (6, 4), (9, 4),
                          (8, 8), (9, 8), (12, 8), ]
 DIFFICULTY_VALUE_SCALE = 10
 
+# Vocabulary sizes
+OUTPUT_VOCAB_SIZE = 215 + 3
+INPUT_VOCAB_SIZE_MLD = OUTPUT_VOCAB_SIZE
+INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
+
 # ==================
 # === Parameters ===
 # ==================
@@ -31,6 +36,3 @@ D_MODEL = 128
 DFF = 512
 # Dropout rate applied after some operations
 DROPOUT_RATE = 0.1
-
-INPUT_VOCAB_SIZE = 1000 + 2
-OUTPUT_VOCAB_SIZE = 200 + 2

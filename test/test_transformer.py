@@ -3,11 +3,12 @@ import time
 import tensorflow as tf
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset
+from src.network.masking import MaskType
 from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
-from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE, OUTPUT_VOCAB_SIZE, DROPOUT_RATE, \
-    DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, PATH_CHECKPOINT_LEAD
+from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE_DIF, OUTPUT_VOCAB_SIZE, DROPOUT_RATE, \
+    DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, PATH_CHECKPOINT_LEAD, INPUT_VOCAB_SIZE_MLD
 
 
 def test_transformer():
@@ -16,8 +17,8 @@ def test_transformer():
         d_model=D_MODEL,
         h=NUM_HEADS,
         dff=DFF,
-        num_encoders=1,
-        input_vocab_size=INPUT_VOCAB_SIZE,
+        num_encoders=2,
+        input_vocab_sizes=[INPUT_VOCAB_SIZE_MLD, INPUT_VOCAB_SIZE_DIF],
         target_vocab_size=OUTPUT_VOCAB_SIZE,
         rate=DROPOUT_RATE,
         attention_type="relative")
@@ -63,10 +64,11 @@ def test_transformer():
 
             lead_seq = tf.stack(lead_seqs)
             acmp_seq = tf.stack(acmp_seqs)
+            acmp_dif = tf.stack(acmp_difs)
 
             trainer = Trainer(transformer, optimizer, train_loss, train_accuracy)
 
-            trainer([lead_seq], acmp_seq)
+            trainer([lead_seq, acmp_dif], acmp_seq, [MaskType.padding, MaskType.lookahead])
 
             if batch_num % 50 == 0:
                 print(
