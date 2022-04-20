@@ -35,8 +35,7 @@ class Trainer:
                 dec_masks.append(create_padding_mask(s_inp))
             elif mask_types[i] == MaskType.lookahead:
                 dec_mask = create_combined_mask(s_inp)
-                dec_mask = dec_mask[:, :, :1, :]
-                print(dec_mask)
+                dec_mask = dec_mask[:, :, 1:, :]
                 dec_masks.append(dec_mask)
             else:
                 raise UnexpectedValueException("Unknown mask type")
