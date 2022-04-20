@@ -24,7 +24,7 @@ class Trainer:
         tar_real = tar[:, 1:]
 
         enc_masks = []
-        dec_masks = [create_combined_mask(tar)]
+        dec_masks = [create_combined_mask(tar_inp)]
 
         # Create masks
         for s_inp in inp:
