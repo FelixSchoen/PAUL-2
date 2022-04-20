@@ -1,29 +1,31 @@
 import tensorflow as tf
 
 from src.network.attention import AttentionType
-from src.network.layers import EncoderLayer, DecoderMultiLayer
-from src.network.masking import create_padding_mask, create_combined_mask
+from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.positional_encoding import positional_encoding
 from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class Decoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, amount_encoders, target_vocab_size, rate=0.1,
+    def __init__(self, *, num_layers, d_model, h, dff, num_encoders, target_vocab_size, rate=0.1,
                  attention_type=AttentionType.standard):
         super(Decoder, self).__init__()
 
         self.d_model = d_model
         self.num_layers = num_layers
+        self.num_encoders = num_encoders
 
         self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, d_model)
 
-        self.dec_layers = [DecoderMultiLayer(d_model=d_model, h=h, dff=dff, amount_encoders=amount_encoders, rate=rate,
-                                             attention_type=attention_type)
+        self.dec_layers = [DecoderLayer(d_model=d_model, h=h, dff=dff, num_encoders=num_encoders, rate=rate,
+                                        attention_type=attention_type)
                            for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
     def call(self, x, enc_outputs, training, masks):
+        assert len(masks) == self.num_encoders + 1
+
         seq_len = tf.shape(x)[1]
         attention_weights = {}
 
@@ -79,32 +81,34 @@ class Encoder(tf.keras.layers.Layer):
 
 
 class Transformer(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, target_vocab_size, rate=0.1,
+    def __init__(self, *, num_layers, d_model, h, dff, num_encoders, input_vocab_size, target_vocab_size, rate=0.1,
                  attention_type=AttentionType.standard):
         super().__init__()
 
         # Setup Encoder and Decoder
-        self.encoder = Encoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff,
-                               input_vocab_size=input_vocab_size, rate=rate, attention_type=attention_type)
+        self.encoders = [
+            Encoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, input_vocab_size=input_vocab_size, rate=rate,
+                    attention_type=attention_type) for _ in range(num_encoders)]
 
-        self.decoder = Decoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff,
+        self.decoder = Decoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, num_encoders=num_encoders,
                                target_vocab_size=target_vocab_size, rate=rate, attention_type=attention_type)
 
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
-    def call(self, inputs, training):
+    def call(self, inputs, enc_masks, dec_masks, training):
+        assert len(enc_masks) == len(self.encoders)
+        assert len(dec_masks) == len(self.encoders) + 1
+
         # Keras models prefer if you pass all your inputs in the first argument
         inp, tar = inputs
 
-        # Create masks
-        enc_padding_mask = create_padding_mask(inp)
-        dec_padding_mask = create_padding_mask(inp)
-        look_ahead_mask = create_combined_mask(tar)
-
-        enc_output = self.encoder(inp, training, enc_padding_mask)  # Shape: batch_size, inp_seq_len, d_model
+        # Collect encoder outputs
+        enc_outputs = []
+        for i, encoder in enumerate(self.encoders):
+            enc_outputs.append(encoder(inp[i], training, enc_masks[i]))  # Shape: batch_size, inp_seq_len, d_model
 
         # Shape: batch_size, tar_seq_len, d_model
-        dec_output, attention_weights = self.decoder(tar, enc_output, training, look_ahead_mask, dec_padding_mask)
+        dec_output, attention_weights = self.decoder(tar, enc_outputs, training, dec_masks)
 
         final_output = self.final_layer(dec_output)  # Shape: batch_size, tar_seq_len, target_vocab_size
 

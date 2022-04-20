@@ -6,18 +6,18 @@ from src.network.attention import scaled_dot_product_attention, relative_scaled_
 from src.settings import SEQUENCE_MAX_LENGTH
 
 
-class DecoderMultiLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, dff, amount_encoders, rate=0.1, attention_type=AttentionType.standard):
-        super(DecoderMultiLayer, self).__init__()
+class DecoderLayer(tf.keras.layers.Layer):
+    def __init__(self, *, d_model, h, dff, num_encoders, rate=0.1, attention_type=AttentionType.standard):
+        super(DecoderLayer, self).__init__()
 
         self.mha = [MultiHeadAttention(d_model=d_model, h=h, use_bias=False, attention_type=attention_type) for _ in
-                    range(amount_encoders + 1)]
+                    range(num_encoders + 1)]
 
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
 
-        self.norm = [tf.keras.layers.LayerNormalization(epsilon=1e-6) for _ in range(amount_encoders + 2)]
+        self.norm = [tf.keras.layers.LayerNormalization(epsilon=1e-6) for _ in range(num_encoders + 2)]
 
-        self.dropout = [tf.keras.layers.Dropout(rate) for _ in range(amount_encoders + 2)]
+        self.dropout = [tf.keras.layers.Dropout(rate) for _ in range(num_encoders + 2)]
 
     def call(self, x, enc_outputs, training, masks):
         # Encoder Output Shape: batch_size, input_seq_len, d_model

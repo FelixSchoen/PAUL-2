@@ -1,11 +1,9 @@
 import time
 
 import tensorflow as tf
-from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset
-from src.network.attention import skew
-from src.network.optimization import TransformerSchedule, loss_function, accuracy_function
+from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE, OUTPUT_VOCAB_SIZE, DROPOUT_RATE, \
@@ -18,6 +16,7 @@ def test_transformer():
         d_model=D_MODEL,
         h=NUM_HEADS,
         dff=DFF,
+        num_encoders=1,
         input_vocab_size=INPUT_VOCAB_SIZE,
         target_vocab_size=OUTPUT_VOCAB_SIZE,
         rate=DROPOUT_RATE,
@@ -67,7 +66,7 @@ def test_transformer():
 
             trainer = Trainer(transformer, optimizer, train_loss, train_accuracy)
 
-            trainer(lead_seq, acmp_seq)
+            trainer([lead_seq], acmp_seq)
 
             if batch_num % 50 == 0:
                 print(

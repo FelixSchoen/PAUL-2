@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from src.network.masking import create_padding_mask, create_combined_mask
 from src.network.optimization import loss_function, accuracy_function
 
 
@@ -22,8 +23,18 @@ class Trainer:
         tar_inp = tar[:, :-1]
         tar_real = tar[:, 1:]
 
+        enc_masks = []
+        dec_masks = [create_combined_mask(tar)]
+
+        # Create masks
+        for s_inp in inp:
+            enc_padding_mask = create_padding_mask(s_inp)
+            dec_padding_mask = create_padding_mask(s_inp)
+            enc_masks.append(enc_padding_mask)
+            dec_masks.append(dec_padding_mask)
+
         with tf.GradientTape() as tape:
-            predictions, _ = transformer([inp, tar_inp], training=True)
+            predictions, _ = transformer([inp, tar_inp], enc_masks, dec_masks, training=True)
             loss = loss_function(tar_real, predictions)
 
         gradients = tape.gradient(loss, transformer.trainable_variables)
