@@ -1,14 +1,14 @@
 import tensorflow as tf
 
 from src.network.attention import AttentionType
-from src.network.layers import EncoderLayer, DecoderLayer
+from src.network.layers import EncoderLayer, DecoderMultiLayer
 from src.network.masking import create_padding_mask, create_combined_mask
 from src.network.positional_encoding import positional_encoding
 from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class Decoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, target_vocab_size, rate=0.1,
+    def __init__(self, *, num_layers, d_model, h, dff, amount_encoders, target_vocab_size, rate=0.1,
                  attention_type=AttentionType.standard):
         super(Decoder, self).__init__()
 
@@ -18,11 +18,12 @@ class Decoder(tf.keras.layers.Layer):
         self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, d_model)
 
-        self.dec_layers = [DecoderLayer(d_model=d_model, h=h, dff=dff, rate=rate, attention_type=attention_type)
+        self.dec_layers = [DecoderMultiLayer(d_model=d_model, h=h, dff=dff, amount_encoders=amount_encoders, rate=rate,
+                                             attention_type=attention_type)
                            for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, enc_output, training, look_ahead_mask, padding_mask):
+    def call(self, x, enc_outputs, training, masks):
         seq_len = tf.shape(x)[1]
         attention_weights = {}
 
@@ -35,10 +36,10 @@ class Decoder(tf.keras.layers.Layer):
 
         # Apply Decoder Layers
         for i in range(self.num_layers):
-            x, block1, block2 = self.dec_layers[i](x, enc_output, training, look_ahead_mask, padding_mask)
+            x, blocks = self.dec_layers[i](x, enc_outputs, training, masks)
 
-            attention_weights[f'decoder_layer{i + 1}_block1'] = block1
-            attention_weights[f'decoder_layer{i + 1}_block2'] = block2
+            for j, block in enumerate(blocks):
+                attention_weights[f'decoder_layer{i + 1}_block{j + 1}'] = block
 
         # Shape x: batch_size, target_seq_len, d_model
         return x, attention_weights
