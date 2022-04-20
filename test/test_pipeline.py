@@ -1,7 +1,8 @@
-import logging
 import os
 
-from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files
+import pandas as pd
+
+from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer
 from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -12,18 +13,30 @@ def test_load_files():
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
     ds = load_dataset(bars)
 
-    # for batch in ds.as_numpy_iterator():
-    #     for entry in batch:
-    #         print("New Entry")
-    #         lead_msg, lead_dif, acmp_msg, acmp_dif = entry
-    #         print(lead_msg)
-    #         break
-    #     break
+    for batch in ds.as_numpy_iterator():
+        for entry in batch:
+            print("New Entry")
+            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+            print(lead_msg)
+
+            data = []
+
+            detokenizer = Detokenizer()
+
+            for x in lead_msg:
+                data.extend(detokenizer.detokenize(x))
+            data.extend(detokenizer.flush_wait_buffer())
+
+            df = pd.DataFrame(data)
+            print(df)
+
+            break
+        break
 
 
 def test_asdf():
     files = load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data",
-                           flags=["skip_difficulty", "skip_store", "skip_skip"])
+                            flags=["skip_difficulty", "skip_store", "skip_skip"])
 
     signatures = dict()
 

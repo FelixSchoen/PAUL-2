@@ -1,4 +1,11 @@
+from enum import Enum
+
 import tensorflow as tf
+
+
+class AttentionType(Enum):
+    standard = "standard"
+    relative = "relative"
 
 
 def scaled_dot_product_attention(q, k, v, mask):

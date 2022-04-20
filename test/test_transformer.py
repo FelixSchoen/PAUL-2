@@ -80,19 +80,3 @@ def test_transformer():
         print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
         print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
-
-
-@tf.function
-def train_step(transformer, optimizer, train_loss, train_accuracy, inp, tar):
-    tar_inp = tar[:, :-1]
-    tar_real = tar[:, 1:]
-
-    with tf.GradientTape() as tape:
-        predictions, _ = transformer([inp, tar_inp], training=True)
-        loss = loss_function(tar_real, predictions)
-
-    gradients = tape.gradient(loss, transformer.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
-
-    train_loss(loss)
-    train_accuracy(accuracy_function(tar_real, predictions))

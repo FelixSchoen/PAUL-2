@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from src.network.attention import AttentionType
 from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_combined_mask
 from src.network.positional_encoding import positional_encoding
@@ -7,7 +8,8 @@ from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class Decoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, target_vocab_size, rate=0.1, attention_type="standard"):
+    def __init__(self, *, num_layers, d_model, h, dff, target_vocab_size, rate=0.1,
+                 attention_type=AttentionType.standard):
         super(Decoder, self).__init__()
 
         self.d_model = d_model
@@ -43,7 +45,8 @@ class Decoder(tf.keras.layers.Layer):
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, rate=0.1, attention_type="standard"):
+    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, rate=0.1,
+                 attention_type=AttentionType.standard):
         super(Encoder, self).__init__()
 
         self.d_model = d_model
@@ -76,7 +79,7 @@ class Encoder(tf.keras.layers.Layer):
 
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, target_vocab_size, rate=0.1,
-                 attention_type="standard"):
+                 attention_type=AttentionType.standard):
         super().__init__()
 
         # Setup Encoder and Decoder
