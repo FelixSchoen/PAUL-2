@@ -1,45 +1,40 @@
 import argparse
-import sys
+
+from src.util.logging import get_logger
 
 
-class Parser:
-    def __init__(self):
-        parser = argparse.ArgumentParser(
-            description="Badura: An Algorithmic Composer supporting Difficulty Specification",
-            usage='''badura <command> [<args>]''')
+def main():
+    args = parse_arguments()
+    logger = get_logger(__name__)
 
-        parser.add_argument("command", help="Subcommand to run")
+    if args.command == "train":
+        if args.train_mode == "preprocess":
+            logger.info("Preprocessing MIDI files.")
 
-        args = parser.parse_args(sys.argv[1:2])
-        if not hasattr(self, "command_" + args.command):
-            print("Unknown command")
-            parser.print_help()
-            exit(1)
+            # load_midi_files(DATA_MIDI_INPUT_PATH)
+            logger.info("Successfully processed MIDI files.")
+    elif args.command == "generate":
+        pass
 
-        parser = getattr(self, "command_" + args.command)()
-        args = parser.parse_args(sys.argv[2:])
 
-    @staticmethod
-    def command_train():
-        parser = argparse.ArgumentParser(description="Starts the training process")
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Badura: An Algorithmic Composer supporting Difficulty Specification")
+    subparsers = parser.add_subparsers(title="Valid Commands",
+                                       help="Selects the mode of operation.")
 
-        parser.add_argument("mode", choices=["preprocess", "lead", "acmp"],
-                            help="Whether to load the training data, or start the training process of a network")
+    # Train Command
+    parser_train = subparsers.add_parser("train", aliases=["t"], help="Trains the networks or preprocesses data.")
+    parser_train.set_defaults(command="train")
+    parser_train.add_argument("train_mode", choices=["preprocess"], help="Which option of the train suite to run.")
 
-        return parser
+    # Generate Command
+    parser_generate = subparsers.add_parser("generate", aliases=["g"],
+                                            help="Generates new music based on the given parameters.")
+    parser_generate.set_defaults(command="generate")
 
-    @staticmethod
-    def command_gen():
-        parser = argparse.ArgumentParser(description="Generates new MIDI files")
-
-        parser.add_argument("--difficulty", "-d", type=int, required=True,
-                            help="Desired difficulty of the piece")
-
-        parser.add_argument("--primer", "-p", type=str, required=False,
-                            help="Path to a primer MIDI file")
-
-        return parser
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == '__main__':
-    Parser()
+    main()
