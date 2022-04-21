@@ -1,3 +1,5 @@
+ROOT_LOGGER = "badura"
+
 # Where to load raw MIDI files from
 DATA_MIDI_INPUT_PATH = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data"
 # Where to store processed compositions for quicker loading

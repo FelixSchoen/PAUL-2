@@ -1,5 +1,6 @@
 import argparse
 
+from src.data_processing.data_pipeline import load_midi_files
 from src.util.logging import get_logger
 
 
@@ -9,9 +10,9 @@ def main():
 
     if args.command == "train":
         if args.train_mode == "preprocess":
-            logger.info("Preprocessing MIDI files.")
+            logger.info("Preprocessing MIDI files...")
 
-            # load_midi_files(DATA_MIDI_INPUT_PATH)
+            load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
             logger.info("Successfully processed MIDI files.")
     elif args.command == "generate":
         pass

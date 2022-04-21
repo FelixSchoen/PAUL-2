@@ -13,7 +13,8 @@ from sCoda import Composition, Bar
 
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, ROOT_LOGGER
+from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists
 
 
@@ -48,8 +49,11 @@ def load_stored_bars(directory: str) -> [([Bar], [Bar])]:
         for filename in [f for f in filenames if f.endswith(".zip")]:
             files.append((os.path.join(dir_path, filename), filename))
 
+    # Separate into chunks in order to process in parallel
+    files_chunks = list(chunks(files, 8))
+
     pool = Pool()
-    bars = flatten(pool.map(_load_stored_bars, files))
+    bars = flatten(pool.map(_load_stored_bars, files_chunks))
 
     return bars
 
@@ -75,7 +79,7 @@ def load_midi_files(directory: str, flags=None) -> list:
             files.append((os.path.join(dir_path, filename), filename))
 
     # Separate into chunks in order to process in parallel
-    files_chunks = list(chunks(files, 16))
+    files_chunks = list(chunks(files, 8))
 
     pool = Pool()
     loaded_files = pool.starmap(_load_midi_files,
@@ -185,6 +189,7 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
     Returns: A tuple of two lists of bars, each of the same length
 
     """
+    logger = get_logger(__name__)
     lead_track = composition.tracks[0]
     acmp_track = composition.tracks[1]
 
@@ -205,7 +210,7 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
 
         # Split at non-valid time signature
         if signature not in VALID_TIME_SIGNATURES:
-            logging.info("Unknown signature, breaking up bars")
+            logger.info("Unknown signature, breaking up bars.")
             remaining = CONSECUTIVE_BAR_MAX_LENGTH
 
             if len(lead_current) > 0:
@@ -214,6 +219,8 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
 
             lead_current = []
             acmp_current = []
+
+            continue
 
         lead_current.append(lead_bar)
         acmp_current.append(acmp_bar)
@@ -266,16 +273,17 @@ def _load_midi_files(files, flags: list) -> list:
     Returns: A list of processed compositions
 
     """
+    logger = get_logger(__name__)
     processed_files = []
 
     for filepath, filename in files:
         zip_file_path = DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH.format(filename[:-4])
 
         if file_exists(zip_file_path) and "skip_skip" not in flags:
-            logging.info(f"Skipping {filename}")
+            logger.info(f"Skipping {filename}.")
             continue
 
-        logging.info(f"Processing {filename}...")
+        logger.info(f"Processing {filename}...")
 
         # Loading the composition from the file
         composition = _load_composition(filepath)
@@ -331,22 +339,27 @@ def _load_composition(file_path: str) -> Composition:
     return composition
 
 
-def _load_stored_bars(filepath_tuple) -> [([Bar], [Bar])]:
+def _load_stored_bars(filepaths_tuple) -> [([Bar], [Bar])]:
     """ Loads a pickled and preprocessed composition.
 
     Args:
-        filepath_tuple: A tuple consisting of the filepath and name of the file
+        filepaths_tuple: A list of tuples consisting of the filepath and name of the file
 
     Returns: The loaded preprocessed composition
 
     """
-    filepath, filename = filepath_tuple
+    logger = get_logger(__name__)
+    loaded_files = []
 
-    print(f"Loading {filename}...")
-    with gzip.open(filepath, "rb") as f:
-        from_pickle = pickle.load(f)
+    for filepath, filename in filepaths_tuple:
+        logger.info(f"Loading {filename}...")
 
-    return from_pickle
+        with gzip.open(filepath, "rb") as f:
+            from_pickle = pickle.load(f)
+
+        loaded_files.append(from_pickle)
+
+    return flatten(loaded_files)
 
 
 def _pad_tuples(tuples_to_pad):

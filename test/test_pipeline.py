@@ -8,6 +8,10 @@ from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
+def test_load_sparse_files():
+    load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
+
+
 def test_load_files():
     load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
@@ -34,7 +38,7 @@ def test_load_files():
         break
 
 
-def test_asdf():
+def test_count_signatures():
     files = load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data",
                             flags=["skip_difficulty", "skip_store", "skip_skip"])
 
@@ -61,18 +65,24 @@ def test_asdf():
     print(signatures)
     print(sorted(signatures, key=signatures.get))
 
-# TODO Cleanup
-# def test_asdf():
-#     composition = Composition.from_file("resources/beethoven_o27-2_m1.mid", [[1, 2], [3]], [0, 4])
-#     dataframes = [bar.to_relative_dataframe() for bar in composition.tracks[0].bars]
-#
-#     tensors = []
-#
-#     for dataframe in dataframes:
-#         tensors.append(dataframe_to_numeric_representation(dataframe))
-#
-#     dataset = tf.data.Dataset.from_tensors(tensors)
-#     print(dataset)
-#
-#     for element in dataset:
-#         print(element)
+
+def test_count_length():
+    bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
+    ds = load_dataset(bars)
+
+    for batch in ds.as_numpy_iterator():
+        for entry in batch:
+            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+
+            data = []
+
+            detokenizer = Detokenizer()
+
+            for x in lead_msg:
+                data.extend(detokenizer.detokenize(x))
+            data.extend(detokenizer.flush_wait_buffer())
+
+            print(data)
+
+            break
+        break
