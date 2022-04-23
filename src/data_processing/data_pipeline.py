@@ -1,6 +1,5 @@
 import copy
 import gzip
-import logging
 import os.path
 import pickle
 import re
@@ -13,7 +12,7 @@ from sCoda import Composition, Bar
 
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, ROOT_LOGGER
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists
 
@@ -79,7 +78,7 @@ def load_midi_files(directory: str, flags=None) -> list:
             files.append((os.path.join(dir_path, filename), filename))
 
     # Separate into chunks in order to process in parallel
-    files_chunks = list(chunks(files, 8))
+    files_chunks = list(chunks(files, 1))
 
     pool = Pool()
     loaded_files = pool.starmap(_load_midi_files,
@@ -210,7 +209,7 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
 
         # Split at non-valid time signature
         if signature not in VALID_TIME_SIGNATURES:
-            logger.info("Unknown signature, breaking up bars.")
+            logger.debug("Unknown signature, breaking up bars.")
             remaining = CONSECUTIVE_BAR_MAX_LENGTH
 
             if len(lead_current) > 0:
@@ -236,8 +235,9 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
             lead_current = []
             acmp_current = []
 
-    lead_chunked = list(chunks(lead_track.bars, CONSECUTIVE_BAR_MAX_LENGTH))
-    acmp_chunked = list(chunks(acmp_track.bars, CONSECUTIVE_BAR_MAX_LENGTH))
+    if len(lead_current) > 0:
+        lead_chunked.append(lead_current)
+        acmp_chunked.append(acmp_current)
 
     # Zip the chunked bars
     zipped_chunks = list(zip(lead_chunked, acmp_chunked))
@@ -304,6 +304,8 @@ def _load_midi_files(files, flags: list) -> list:
                 pickle.dump(augmented_bars, f)
 
         processed_files.append(augmented_bars)
+
+        logger.info(f"Finished processing {filename}.")
 
     return processed_files
 

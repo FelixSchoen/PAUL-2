@@ -32,6 +32,11 @@ def flatten(lst) -> []:
     return [item for sublist in lst for item in sublist]
 
 
+def get_project_root() -> str:
+    root_path = Path(__file__).parent.parent
+    return str(root_path)
+
+
 def remove_random(lst, n) -> []:
     """ Removes a percentage of the list's contents, randomly chosen.
 

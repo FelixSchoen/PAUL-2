@@ -1,6 +1,9 @@
 import os
 
+import numpy as np
 import pandas as pd
+import tensorflow as tf
+from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer
 from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
@@ -70,19 +73,18 @@ def test_count_length():
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
     ds = load_dataset(bars)
 
+    a = []
+
     for batch in ds.as_numpy_iterator():
         for entry in batch:
-            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+            lead_msg, _, acmp_msg, _ = entry
 
-            data = []
+            a.append(tf.math.count_nonzero(lead_msg).numpy())
+            a.append(tf.math.count_nonzero(acmp_msg).numpy())
 
-            detokenizer = Detokenizer()
+    max_length = max(a)
 
-            for x in lead_msg:
-                data.extend(detokenizer.detokenize(x))
-            data.extend(detokenizer.flush_wait_buffer())
-
-            print(data)
-
-            break
-        break
+    plt.hist(a, np.linspace(1, 512, 512))
+    plt.ylim(plt.ylim())
+    plt.plot([max_length, max_length], plt.ylim())
+    plt.show()
