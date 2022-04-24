@@ -1,3 +1,5 @@
+import gzip
+import pickle
 import random
 from pathlib import Path
 
@@ -35,6 +37,16 @@ def flatten(lst) -> []:
 def get_project_root() -> str:
     root_path = Path(__file__).parent.parent
     return str(root_path)
+
+
+def pickle_load(file_path):
+    with gzip.open(file_path, "rb") as f:
+        return pickle.load(f)
+
+
+def pickle_save(obj, file_path):
+    with gzip.open(file_path, "wb+") as f:
+        pickle.dump(obj, f)
 
 
 def remove_random(lst, n) -> []:

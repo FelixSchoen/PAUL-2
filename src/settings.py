@@ -1,3 +1,4 @@
+# Name of the root logger
 ROOT_LOGGER = "badura"
 
 # Where to load raw MIDI files from
@@ -18,8 +19,8 @@ VALID_TIME_SIGNATURES = [(2, 2), (2, 4), (3, 4), (4, 4), (5, 4), (6, 4), (9, 4),
 DIFFICULTY_VALUE_SCALE = 10
 
 # Vocabulary sizes
-OUTPUT_VOCAB_SIZE = 215 + 3
-INPUT_VOCAB_SIZE_MLD = OUTPUT_VOCAB_SIZE
+LEAD_OUTPUT_VOCAB_SIZE = 215 + 3
+LEAD_INPUT_VOCAB_SIZE_MLD = LEAD_OUTPUT_VOCAB_SIZE
 INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
 
 # ==================

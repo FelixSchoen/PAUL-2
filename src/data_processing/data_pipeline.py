@@ -1,7 +1,5 @@
 import copy
-import gzip
 import os.path
-import pickle
 import re
 from multiprocessing import Pool
 
@@ -14,7 +12,7 @@ from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
     BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE
 from src.util.logging import get_logger
-from src.util.util import chunks, flatten, file_exists
+from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
 
 def load_dataset(bars: [([Bar], [Bar])]):
@@ -25,7 +23,7 @@ def load_dataset(bars: [([Bar], [Bar])]):
     # Construct dataset
     ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
         .cache() \
-        .shuffle(BUFFER_SIZE) \
+        .shuffle(BUFFER_SIZE, seed=6512924) \
         .batch(BATCH_SIZE) \
         .prefetch(tf.data.AUTOTUNE)
 
@@ -49,7 +47,7 @@ def load_stored_bars(directory: str) -> [([Bar], [Bar])]:
             files.append((os.path.join(dir_path, filename), filename))
 
     # Separate into chunks in order to process in parallel
-    files_chunks = list(chunks(files, 8))
+    files_chunks = list(chunks(files, 16))
 
     pool = Pool()
     bars = flatten(pool.map(_load_stored_bars, files_chunks))
@@ -74,7 +72,7 @@ def load_midi_files(directory: str, flags=None) -> list:
 
     # Handle all MIDI files in the given directory and subdirectories
     for dir_path, _, filenames in os.walk(directory):
-        for filename in [f for f in filenames if f.endswith(".mid")]:
+        for filename in [f for f in filenames if f.endswith(".zip")]:
             files.append((os.path.join(dir_path, filename), filename))
 
     # Separate into chunks in order to process in parallel
@@ -300,8 +298,7 @@ def _load_midi_files(files, flags: list) -> list:
 
         # Store to file
         if "skip_store" not in flags:
-            with gzip.open(zip_file_path, "wb+") as f:
-                pickle.dump(augmented_bars, f)
+            pickle_save(augmented_bars, zip_file_path)
 
         processed_files.append(augmented_bars)
 
@@ -356,8 +353,7 @@ def _load_stored_bars(filepaths_tuple) -> [([Bar], [Bar])]:
     for filepath, filename in filepaths_tuple:
         logger.info(f"Loading {filename}...")
 
-        with gzip.open(filepath, "rb") as f:
-            from_pickle = pickle.load(f)
+        from_pickle = pickle_load(filepath)
 
         loaded_files.append(from_pickle)
 
@@ -371,6 +367,29 @@ def _pad_tuples(tuples_to_pad):
         results.append(np.pad(ele, (0, SEQUENCE_MAX_LENGTH - ele.shape[0]), "constant"))
 
     return results
+
+
+def tryout_generator(directory):
+    files = []
+
+    for dir_path, _, filenames in os.walk(directory):
+        for filename in [f for f in filenames if f[-4:] == ".zip"]:
+            files.append((os.path.join(dir_path, filename), filename))
+
+    def _generator():
+        i = 0
+        while i < len(files):
+            bars = pickle_load(files[i][0])
+            tensors = _bar_tuple_to_token_tuple(bars[0])
+
+            i += 1
+            if not _filter_length(tensors):
+                continue
+
+            data_row = _pad_tuples(tensors)
+            yield data_row
+
+    return _generator()
 
 
 class Tokenizer:

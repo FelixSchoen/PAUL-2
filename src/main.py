@@ -1,6 +1,7 @@
 import argparse
 
 from src.data_processing.data_pipeline import load_midi_files
+from src.network.badura import train_lead
 from src.settings import DATA_MIDI_INPUT_PATH
 from src.util.logging import get_logger
 
@@ -15,6 +16,12 @@ def main():
 
             load_midi_files(DATA_MIDI_INPUT_PATH)
             logger.info("Successfully processed MIDI files.")
+        elif args.train_mode == "lead":
+            logger.info("Starting training process for lead network...")
+
+            train_lead()
+
+            logger.info("Successfully trained lead network.")
     elif args.command == "generate":
         pass
 
@@ -27,7 +34,8 @@ def parse_arguments():
     # Train Command
     parser_train = subparsers.add_parser("train", aliases=["t"], help="Trains the networks or preprocesses data.")
     parser_train.set_defaults(command="train")
-    parser_train.add_argument("train_mode", choices=["preprocess"], help="Which option of the train suite to run.")
+    parser_train.add_argument("train_mode", choices=["preprocess", "lead"],
+                              help="Which option of the train suite to run.")
 
     # Generate Command
     parser_generate = subparsers.add_parser("generate", aliases=["g"],

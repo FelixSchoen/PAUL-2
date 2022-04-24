@@ -1,12 +1,14 @@
 import os
+import time
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer
-from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
+from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer, \
+    tryout_generator
+from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, BUFFER_SIZE, BATCH_SIZE
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -88,3 +90,44 @@ def test_count_length():
     plt.ylim(plt.ylim())
     plt.plot([max_length, max_length], plt.ylim())
     plt.show()
+
+
+def test_time_load():
+    start_time = time.perf_counter()
+    bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    end_time = time.perf_counter()
+
+    print(f"Time needed for loading bars: {end_time - start_time}")
+
+    start_time = time.perf_counter()
+    ds = load_dataset(bars)
+    end_time = time.perf_counter()
+
+    print(f"Time needed for loading dataset: {end_time - start_time}")
+
+    filename = "D:/Documents/Coding/Repository/Badura/out/dataset/dataset.tfrecord"
+
+    writer = tf.io.TFRecordWriter(filename)
+    writer.write(ds)
+
+
+def test_custom_generator():
+    asdf = list(tryout_generator("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions"))
+
+    ds = tf.data.Dataset.from_tensor_slices(asdf) \
+        .cache() \
+        .shuffle(BUFFER_SIZE, seed=6512924) \
+        .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
+
+    for batch in ds.as_numpy_iterator():
+        for entry in batch:
+            print("New Entry")
+            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+            print(lead_msg)
+            break
+        break
+
+    filename = 'test.tfrecord'
+    writer = tf.data.experimental.TFRecordWriter(filename)
+    writer.write(ds)
