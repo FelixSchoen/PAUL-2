@@ -112,18 +112,17 @@ def test_time_load():
 
 
 def test_custom_generator():
+    start_time = time.perf_counter()
     dataset = tf.data.Dataset.from_generator(tryout_generator, output_signature=(
         tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
-    ), args=["D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions"]) \
+    ), args=["D:/Documents/Coding/Repository/Badura/out/pickle/compositions"]) \
         .cache() \
         .shuffle(BUFFER_SIZE, seed=6512924) \
         .batch(BATCH_SIZE) \
         .prefetch(tf.data.AUTOTUNE)
 
-    for batch in dataset.as_numpy_iterator():
-        for entry in batch:
-            print("New Entry")
-            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
-            print(lead_msg)
-            break
-        break
+    list(dataset.as_numpy_iterator())
+
+    end_time = time.perf_counter()
+
+    print(f"Time needed for loading dataset: {end_time - start_time}")

@@ -380,6 +380,10 @@ def tryout_generator(directory):
         i = 0
         while i < len(files):
             bars = pickle_load(files[i][0])
+
+            if len(bars) == 0:
+                continue
+
             tensors = _bar_tuple_to_token_tuple(bars[0])
 
             i += 1
