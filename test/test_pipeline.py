@@ -1,5 +1,6 @@
 import os
 import time
+from logging import getLogger
 
 import numpy as np
 import pandas as pd
@@ -105,11 +106,6 @@ def test_time_load():
 
     print(f"Time needed for loading dataset: {end_time - start_time}")
 
-    filename = "D:/Documents/Coding/Repository/Badura/out/dataset/dataset.tfrecord"
-
-    writer = tf.io.TFRecordWriter(filename)
-    writer.write(ds)
-
 
 def test_custom_generator():
     start_time = time.perf_counter()
@@ -126,3 +122,49 @@ def test_custom_generator():
     end_time = time.perf_counter()
 
     print(f"Time needed for loading dataset: {end_time - start_time}")
+
+
+def test_save_dataset_to_file():
+    LOGGER = getLogger("badura." + __name__)
+
+    LOGGER.info("Loading bars")
+    ds = tf.data.Dataset.from_generator(tryout_generator, output_signature=(
+        tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
+    ), args=["D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions"]) \
+        .cache() \
+        .shuffle(BUFFER_SIZE, seed=6512924) \
+        .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
+    LOGGER.info("Loading dataset")
+
+    LOGGER.info("Serializing dataset")
+
+    path = "D:/Documents/Coding/Repository/Badura/out/dataset/"
+
+    LOGGER.info("Writing dataset")
+
+    print(ds.element_spec)
+
+    tf.data.experimental.save(ds, path)
+    new_dataset = tf.data.experimental.load(path, element_spec=(
+        tf.TensorSpec(shape=(None, 4, 512), dtype=tf.int16)
+    ))
+
+    for batch in new_dataset.as_numpy_iterator():
+        for entry in batch:
+            print("New Entry")
+            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+            print(lead_msg)
+
+    print(ds.element_spec)
+
+    # # writer = tf.data.experimental.TFRecordWriter(record_file)
+    # # writer.write(dataset)
+    # tf.data.experimental.save(dataset, record_file)
+    #
+    # LOGGER.info("Reloading dataset")
+    # # Read from file
+    # loaded_ds = (tf.data.TFRecordDataset(record_file)
+    #              .map(lambda x: tf.io.parse_tensor(x, tf.int16)))
+    # for y in loaded_ds:
+    #     tf.print(y)
