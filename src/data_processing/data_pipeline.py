@@ -1,4 +1,5 @@
 import copy
+import logging
 import os.path
 import re
 from multiprocessing import Pool
@@ -382,6 +383,7 @@ def tryout_generator(directory):
             bars = pickle_load(files[i][0])
 
             if len(bars) == 0:
+                i += 1
                 continue
 
             tensors = _bar_tuple_to_token_tuple(bars[0])
