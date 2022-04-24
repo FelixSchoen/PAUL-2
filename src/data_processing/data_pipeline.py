@@ -372,8 +372,8 @@ def _pad_tuples(tuples_to_pad):
 def tryout_generator(directory):
     files = []
 
-    for dir_path, _, filenames in os.walk(directory):
-        for filename in [f for f in filenames if f[-4:] == ".zip"]:
+    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
+        for filename in [f for f in filenames if f.endswith(".zip")]:
             files.append((os.path.join(dir_path, filename), filename))
 
     def _generator():
@@ -387,7 +387,7 @@ def tryout_generator(directory):
                 continue
 
             data_row = _pad_tuples(tensors)
-            yield data_row
+            yield tf.convert_to_tensor(data_row, dtype=tf.int16)
 
     return _generator()
 

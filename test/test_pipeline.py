@@ -112,22 +112,18 @@ def test_time_load():
 
 
 def test_custom_generator():
-    asdf = list(tryout_generator("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions"))
-
-    ds = tf.data.Dataset.from_tensor_slices(asdf) \
+    dataset = tf.data.Dataset.from_generator(tryout_generator, output_signature=(
+        tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
+    ), args=["D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions"]) \
         .cache() \
         .shuffle(BUFFER_SIZE, seed=6512924) \
         .batch(BATCH_SIZE) \
         .prefetch(tf.data.AUTOTUNE)
 
-    for batch in ds.as_numpy_iterator():
+    for batch in dataset.as_numpy_iterator():
         for entry in batch:
             print("New Entry")
             lead_msg, lead_dif, acmp_msg, acmp_dif = entry
             print(lead_msg)
             break
         break
-
-    filename = 'test.tfrecord'
-    writer = tf.data.experimental.TFRecordWriter(filename)
-    writer.write(ds)
