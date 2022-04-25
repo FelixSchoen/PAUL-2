@@ -27,8 +27,8 @@ INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
 # === Parameters ===
 # ==================
 
-BATCH_SIZE = 64
-BUFFER_SIZE = 20000
+BATCH_SIZE = 256
+BUFFER_SIZE = 65536
 # How often the encoder / decoder should be stacked
 NUM_LAYERS = 4
 # Number of attention heads

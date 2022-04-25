@@ -11,7 +11,7 @@ from sCoda import Composition, Bar
 
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
@@ -26,6 +26,19 @@ def load_dataset(bars: [([Bar], [Bar])]):
         .cache() \
         .shuffle(BUFFER_SIZE, seed=6512924) \
         .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
+
+    return ds
+
+
+def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, batch_size=BATCH_SIZE):
+    # TODO drop_remainder=True ?
+    ds = tf.data.Dataset.from_generator(bar_generator_copy, output_signature=(
+        tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
+    ), args=[directory]) \
+        .cache() \
+        .shuffle(BUFFER_SIZE, seed=6512924) \
+        .batch(batch_size) \
         .prefetch(tf.data.AUTOTUNE)
 
     return ds
@@ -370,9 +383,10 @@ def _pad_tuples(tuples_to_pad):
     return results
 
 
-def tryout_generator(directory):
+def bar_generator(directory):
     files = []
 
+    # Directory given in binary
     for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
         for filename in [f for f in filenames if f.endswith(".zip")]:
             files.append((os.path.join(dir_path, filename), filename))
@@ -382,20 +396,52 @@ def tryout_generator(directory):
         while i < len(files):
             bars = pickle_load(files[i][0])
 
+            i += 1
             if len(bars) == 0:
-                i += 1
                 continue
 
             tensors = _bar_tuple_to_token_tuple(bars[0])
 
-            i += 1
             if not _filter_length(tensors):
                 continue
 
             data_row = _pad_tuples(tensors)
-            yield tf.convert_to_tensor(data_row, dtype=tf.int16)
+            yield tf.convert_to_tensor(data_row, dtype=tf.int16)  # TODO Conversion needed?
 
     return _generator()
+
+
+def bar_generator_copy(directory):
+    files = []
+
+    # Directory given in binary
+    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
+        for filename in [f for f in filenames if f.endswith(".zip")]:
+            files.append((os.path.join(dir_path, filename), filename))
+
+    def _bars_generator(files_list):
+        for i, file in enumerate(files_list):
+            logging.info("Start loading")
+            bars = pickle_load(files_list[i][0])
+            logging.info("Finished loading")
+
+            if len(bars) == 0:
+                continue
+
+            yield bars
+
+    def _tensor_generator():
+        for bars in _bars_generator(files):
+            for bar in bars:
+                tensors = _bar_tuple_to_token_tuple(bar)
+
+                if not _filter_length(tensors):
+                    continue
+
+                data_row = _pad_tuples(tensors)
+                yield data_row
+
+    return _tensor_generator()
 
 
 class Tokenizer:

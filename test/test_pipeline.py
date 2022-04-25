@@ -1,4 +1,3 @@
-import os
 import time
 from logging import getLogger
 
@@ -8,10 +7,8 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer, \
-    tryout_generator
-from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, BUFFER_SIZE, BATCH_SIZE
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    load_oom_dataset
+from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 
 def test_load_sparse_files():
@@ -108,40 +105,37 @@ def test_time_load():
 
 
 def test_custom_generator():
-    start_time = time.perf_counter()
-    dataset = tf.data.Dataset.from_generator(tryout_generator, output_signature=(
-        tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
-    ), args=["D:/Documents/Coding/Repository/Badura/out/pickle/compositions"]) \
-        .cache() \
-        .shuffle(BUFFER_SIZE, seed=6512924) \
-        .batch(BATCH_SIZE) \
-        .prefetch(tf.data.AUTOTUNE)
+    logger = getLogger("badura." + __name__)
 
-    list(dataset.as_numpy_iterator())
+    start_time = time.perf_counter()
+    logger.info("Loading dataset")
+    ds = load_oom_dataset(directory="D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+
+    i = 0
+    e = 0
+    for batch in ds.as_numpy_iterator():
+        i += 1
+        for entry in batch:
+            e += 1
+            if e == 1:
+                lead_msg, lead_dif, acmp_msg, acmp_dif = entry
 
     end_time = time.perf_counter()
 
-    print(f"Time needed for loading dataset: {end_time - start_time}")
+    logger.info(f"{i} Batches, {e} Entries")
+
+    logger.info(f"Time needed for loading dataset: {end_time - start_time}")
 
 
 def test_save_dataset_to_file():
-    LOGGER = getLogger("badura." + __name__)
+    logger = getLogger("badura." + __name__)
 
-    LOGGER.info("Loading bars")
-    ds = tf.data.Dataset.from_generator(tryout_generator, output_signature=(
-        tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
-    ), args=["D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions"]) \
-        .cache() \
-        .shuffle(BUFFER_SIZE, seed=6512924) \
-        .batch(BATCH_SIZE) \
-        .prefetch(tf.data.AUTOTUNE)
-    LOGGER.info("Loading dataset")
-
-    LOGGER.info("Serializing dataset")
+    logger.info("Loading dataset")
+    ds = load_oom_dataset(directory="D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
 
     path = "D:/Documents/Coding/Repository/Badura/out/dataset/"
 
-    LOGGER.info("Writing dataset")
+    logger.info("Writing dataset")
 
     print(ds.element_spec)
 
@@ -157,14 +151,3 @@ def test_save_dataset_to_file():
             print(lead_msg)
 
     print(ds.element_spec)
-
-    # # writer = tf.data.experimental.TFRecordWriter(record_file)
-    # # writer.write(dataset)
-    # tf.data.experimental.save(dataset, record_file)
-    #
-    # LOGGER.info("Reloading dataset")
-    # # Read from file
-    # loaded_ds = (tf.data.TFRecordDataset(record_file)
-    #              .map(lambda x: tf.io.parse_tensor(x, tf.int16)))
-    # for y in loaded_ds:
-    #     tf.print(y)
