@@ -1,13 +1,16 @@
 # Name of the root logger
 ROOT_LOGGER = "badura"
 
+ROOT_PATH = "D:/Documents/Coding/Repository/Badura"
+
 # Where to load raw MIDI files from
 DATA_MIDI_INPUT_PATH = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data"
 # Where to store processed compositions for quicker loading
-DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH = "D:/Documents/Coding/Repository/Badura/out/pickle/compositions"
+DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/pickle/compositions"
 DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH = DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH + "/{0}.zip"
+DATA_SET_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data.tfrecords"
 
-PATH_CHECKPOINT_LEAD = "D:/Documents/Coding/Repository/Badura/out/badura/checkpoint"
+PATH_CHECKPOINT_LEAD = ROOT_PATH + "/out/badura/checkpoint"
 
 # Length of tensors representing sequences
 SEQUENCE_MAX_LENGTH = 512

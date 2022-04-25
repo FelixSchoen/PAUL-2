@@ -1,8 +1,7 @@
 import argparse
 
-from src.data_processing.data_pipeline import load_midi_files
+from src.data_processing.data_pipeline import load_and_store_records
 from src.network.badura import train_lead
-from src.settings import DATA_MIDI_INPUT_PATH
 from src.util.logging import get_logger
 
 
@@ -14,7 +13,12 @@ def main():
         if args.train_mode == "preprocess":
             logger.info("Preprocessing MIDI files...")
 
-            load_midi_files(DATA_MIDI_INPUT_PATH)
+            logger.info("Loading MIDI files...")
+            # load_midi_files(DATA_MIDI_INPUT_PATH)
+
+            logger.info("Storing TFRecords...")
+            load_and_store_records()
+
             logger.info("Successfully processed MIDI files.")
         elif args.train_mode == "lead":
             logger.info("Starting training process for lead network...")

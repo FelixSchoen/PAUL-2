@@ -1,15 +1,14 @@
 import time
 from logging import getLogger
-from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer, \
-    load_oom_dataset, _bar_tuple_to_token_tuple, _filter_length, _pad_tuples
-from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, BUFFER_SIZE, SHUFFLE_SEED, BATCH_SIZE
+from src.data_processing.data_pipeline import load_stored_bars, load_dataset_from_bars, load_midi_files, Detokenizer, \
+    load_oom_dataset
+from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 
 def test_load_sparse_midi_files():
@@ -19,7 +18,7 @@ def test_load_sparse_midi_files():
 def test_pipeline():
     load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
-    ds = load_dataset(bars)
+    ds = load_dataset_from_bars(bars)
 
     for batch in ds.as_numpy_iterator():
         for entry in batch:
@@ -72,7 +71,7 @@ def test_count_signatures():
 
 def test_count_length():
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
-    ds = load_dataset(bars)
+    ds = load_dataset_from_bars(bars)
 
     a = []
 
@@ -99,7 +98,7 @@ def test_time_load():
     print(f"Time needed for loading bars: {end_time - start_time}")
 
     start_time = time.perf_counter()
-    ds = load_dataset(bars)
+    ds = load_dataset_from_bars(bars)
     end_time = time.perf_counter()
 
     print(f"Time needed for loading dataset: {end_time - start_time}")
@@ -160,7 +159,7 @@ def test_compare_speed_oom_normal():
 
     start_time = time.perf_counter()
     bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
-    ds = load_dataset(bars)
+    ds = load_dataset_from_bars(bars)
     list(ds)
     del bars, ds
     end_time = time.perf_counter()
@@ -171,75 +170,3 @@ def test_compare_speed_oom_normal():
     list(ds)
     end_time = time.perf_counter()
     logger.info(f"Time needed for loading dataset: {end_time - start_time}")
-
-
-def tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif):
-    def _int_feature(value):
-        return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
-
-    feature = {
-        "lead_msg": _int_feature(lead_msg),
-        "lead_dif": _int_feature(lead_dif),
-        "acmp_msg": _int_feature(acmp_msg),
-        "acmp_dif": _int_feature(acmp_dif),
-    }
-
-    return tf.train.Example(features=tf.train.Features(feature=feature))
-
-
-def _serialize_example(entry):
-    lead_msg, lead_dif, acmp_msg, acmp_dif = entry
-    record = tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif)
-    return record.SerializeToString()
-
-
-def test_convert_to_tfrecords():
-    bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
-    data_rows = map(_bar_tuple_to_token_tuple, bars)
-    data_rows = filter(_filter_length, data_rows)
-    data_rows = map(_pad_tuples, data_rows)
-
-    pool = Pool()
-    options = tf.io.TFRecordOptions(compression_type="GZIP")
-    with tf.io.TFRecordWriter("D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords",
-                              options=options) as writer:
-        for example in pool.map(_serialize_example, list(data_rows)):
-            print("Writing")
-            writer.write(example)
-
-
-def test_read_tfrecords():
-    files = ["D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords"]
-
-    raw_dataset = tf.data.TFRecordDataset(files, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
-
-    feature_desc = {
-        "lead_msg": tf.io.FixedLenFeature([512], tf.int64),
-        "lead_dif": tf.io.FixedLenFeature([512], tf.int64),
-        "acmp_msg": tf.io.FixedLenFeature([512], tf.int64),
-        "acmp_dif": tf.io.FixedLenFeature([512], tf.int64),
-    }
-
-    def _parse_function(example_proto):
-        dictionary = tf.io.parse_single_example(example_proto, feature_desc)
-        return tf.stack(
-            [tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             ])
-
-    ds = raw_dataset.map(_parse_function) \
-        .cache() \
-        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
-        .batch(BATCH_SIZE) \
-        .prefetch(tf.data.AUTOTUNE)
-
-    for batch in ds.as_numpy_iterator():
-        print(f"Batch length: {len(batch)}")
-        for entry in batch:
-            a, b, c, d = entry
-            print(tf.shape(tf.cast(a, dtype=tf.int16)))
-            break
-        print(tf.shape(batch))
-        break

@@ -16,11 +16,6 @@ from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
 
-def custom_reader_func(datasets, num_shards):
-    datasets = datasets.shuffle(num_shards)
-    return datasets.interleave(lambda x: x, num_parallel_calls=AUTOTUNE)
-
-
 def bar_generator(directory):
     logger = get_logger(__name__)
     files = []
@@ -54,13 +49,57 @@ def bar_generator(directory):
     return _tensor_generator()
 
 
-def load_dataset(bars: [([Bar], [Bar])]):
+def load_and_store_records(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH):
+    bars = load_stored_bars(directory=directory)
+    data_rows = map(_bar_tuple_to_token_tuple, bars)
+    data_rows = filter(_filter_length, data_rows)
+    data_rows = map(_pad_tuples, data_rows)
+
+    pool = Pool()
+    options = tf.io.TFRecordOptions(compression_type="GZIP")
+    with tf.io.TFRecordWriter("D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords",
+                              options=options) as writer:
+        for example in pool.map(_serialize_example, list(data_rows)):
+            writer.write(example)
+
+
+def load_dataset_from_bars(bars: [([Bar], [Bar])]):
     data_rows = map(_bar_tuple_to_token_tuple, bars)
     data_rows = filter(_filter_length, data_rows)
     data_rows = map(_pad_tuples, data_rows)
 
     # Construct dataset
     ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
+        .cache() \
+        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
+        .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
+
+    return ds
+
+
+def load_dataset_from_records(files=None):
+    if files is None:
+        files = ["D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords"]
+    raw_dataset = tf.data.TFRecordDataset(files, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
+
+    feature_desc = {
+        "lead_msg": tf.io.FixedLenFeature([512], tf.int64),
+        "lead_dif": tf.io.FixedLenFeature([512], tf.int64),
+        "acmp_msg": tf.io.FixedLenFeature([512], tf.int64),
+        "acmp_dif": tf.io.FixedLenFeature([512], tf.int64),
+    }
+
+    def _parse_function(example_proto):
+        dictionary = tf.io.parse_single_example(example_proto, feature_desc)
+        return tf.stack(
+            [tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             ])
+
+    ds = raw_dataset.map(_parse_function) \
         .cache() \
         .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
         .batch(BATCH_SIZE) \
@@ -419,6 +458,26 @@ def _pad_tuples(tuples_to_pad):
         results.append(np.pad(ele, (0, SEQUENCE_MAX_LENGTH - ele.shape[0]), "constant"))
 
     return results
+
+
+def _serialize_example(entry):
+    lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+    record = _tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif)
+    return record.SerializeToString()
+
+
+def _tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif):
+    def _int_feature(value):
+        return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+    feature = {
+        "lead_msg": _int_feature(lead_msg),
+        "lead_dif": _int_feature(lead_dif),
+        "acmp_msg": _int_feature(acmp_msg),
+        "acmp_dif": _int_feature(acmp_dif),
+    }
+
+    return tf.train.Example(features=tf.train.Features(feature=feature))
 
 
 class Tokenizer:

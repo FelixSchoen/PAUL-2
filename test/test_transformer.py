@@ -3,7 +3,7 @@ import time
 import tensorflow as tf
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
-from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_oom_dataset
+from src.data_processing.data_pipeline import load_stored_bars, load_dataset_from_bars, load_oom_dataset
 from src.network.badura import get_strategy
 from src.network.masking import MaskType
 from src.network.optimization import TransformerSchedule
@@ -27,7 +27,7 @@ def test_transformer():
         attention_type="relative")
 
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
-    ds = load_dataset(bars)
+    ds = load_dataset_from_bars(bars)
 
     learning_rate = TransformerSchedule(D_MODEL)
 
