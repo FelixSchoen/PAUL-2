@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.data_processing.data_pipeline import load_oom_dataset, load_stored_bars, load_dataset
 from src.util.logging import get_logger
@@ -28,18 +27,18 @@ def train_lead():
     strategy = get_strategy()
 
     logger.info("Loading dataset...")
-    # ds = load_oom_dataset("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    ds = load_oom_dataset()#"D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
 
-    bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
-    ds = load_dataset(bars)
+    # bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    # ds = load_dataset(bars)
 
-    options = tf.data.Options()
-    options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
-    ds = ds.with_options(options)
-
-    distributed_ds = strategy.experimental_distribute_dataset(ds)
+    # options = tf.data.Options()
+    # options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
+    # ds = ds.with_options(options)
+    #
+    # distributed_ds = strategy.experimental_distribute_dataset(ds)
 
     logger.info("Counting batches...")
-    num_train_batches = len(list(distributed_ds))
+    num_train_batches = len(list(ds))
 
     logger.info(f"Counted {num_train_batches} batches.")

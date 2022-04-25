@@ -1,5 +1,4 @@
 import copy
-import logging
 import os.path
 import re
 from multiprocessing import Pool
@@ -17,6 +16,44 @@ from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
 
+def custom_reader_func(datasets, num_shards):
+    datasets = datasets.shuffle(num_shards)
+    return datasets.interleave(lambda x: x, num_parallel_calls=AUTOTUNE)
+
+
+def bar_generator(directory):
+    logger = get_logger(__name__)
+    files = []
+
+    # Directory given in binary
+    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
+        for filename in [f for f in filenames if f.endswith(".zip")]:
+            files.append((os.path.join(dir_path, filename), filename))
+
+    def _bars_generator(files_list):
+        for file in files_list:
+            logger.info(f"Loading {file[0]}")
+            bars = pickle_load(file[0])
+
+            if len(bars) == 0:
+                continue
+
+            yield bars
+
+    def _tensor_generator():
+        for bars in _bars_generator(files):
+            for bar in bars:
+                tensors = _bar_tuple_to_token_tuple(bar)
+
+                if not _filter_length(tensors):
+                    continue
+
+                data_row = _pad_tuples(tensors)
+                yield data_row
+
+    return _tensor_generator()
+
+
 def load_dataset(bars: [([Bar], [Bar])]):
     data_rows = map(_bar_tuple_to_token_tuple, bars)
     data_rows = filter(_filter_length, data_rows)
@@ -32,13 +69,13 @@ def load_dataset(bars: [([Bar], [Bar])]):
     return ds
 
 
-def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH):
+def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
     # TODO drop_remainder=True ?
+    #         .cache() \
     ds = tf.data.Dataset.from_generator(bar_generator, output_signature=(
         tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
     ), args=[directory]) \
-        .cache() \
-        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
+        .shuffle(buffer_size, seed=SHUFFLE_SEED) \
         .batch(BATCH_SIZE) \
         .prefetch(tf.data.AUTOTUNE)
 
@@ -382,39 +419,6 @@ def _pad_tuples(tuples_to_pad):
         results.append(np.pad(ele, (0, SEQUENCE_MAX_LENGTH - ele.shape[0]), "constant"))
 
     return results
-
-
-def bar_generator(directory):
-    logger = get_logger(__name__)
-    files = []
-
-    # Directory given in binary
-    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
-        for filename in [f for f in filenames if f.endswith(".zip")]:
-            files.append((os.path.join(dir_path, filename), filename))
-
-    def _bars_generator(files_list):
-        for file in files_list:
-            logger.info(f"Loading {file[0]}")
-            bars = pickle_load(file[0])
-
-            if len(bars) == 0:
-                continue
-
-            yield bars
-
-    def _tensor_generator():
-        for bars in _bars_generator(files):
-            for bar in bars:
-                tensors = _bar_tuple_to_token_tuple(bar)
-
-                if not _filter_length(tensors):
-                    continue
-
-                data_row = _pad_tuples(tensors)
-                yield data_row
-
-    return _tensor_generator()
 
 
 class Tokenizer:

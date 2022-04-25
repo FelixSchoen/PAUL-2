@@ -1,5 +1,6 @@
 import time
 from logging import getLogger
+from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
@@ -7,7 +8,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer, \
-    load_oom_dataset
+    load_oom_dataset, _bar_tuple_to_token_tuple, _filter_length, _pad_tuples
 from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 
@@ -131,18 +132,19 @@ def test_save_dataset_to_file():
     logger = getLogger("badura." + __name__)
 
     logger.info("Loading dataset")
-    ds = load_oom_dataset(directory="D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    ds = load_oom_dataset()
 
     path = "D:/Documents/Coding/Repository/Badura/out/dataset/"
 
-    logger.info("Writing dataset")
-
-    print(ds.element_spec)
-
+    logger.info("Saving dataset")
     tf.data.experimental.save(ds, path)
+
+    logger.info("Loading dataset")
     new_dataset = tf.data.experimental.load(path, element_spec=(
         tf.TensorSpec(shape=(None, 4, 512), dtype=tf.int16)
     ))
+
+    logger.info("Loaded dataset")
 
     for batch in new_dataset.as_numpy_iterator():
         for entry in batch:
@@ -169,3 +171,60 @@ def test_compare_speed_oom_normal():
     list(ds)
     end_time = time.perf_counter()
     logger.info(f"Time needed for loading dataset: {end_time - start_time}")
+
+
+def tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif):
+    def _int_feature(value):
+        return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+    feature = {
+        "lead_msg": _int_feature(lead_msg),
+        "lead_dif": _int_feature(lead_dif),
+        "acmp_msg": _int_feature(acmp_msg),
+        "acmp_dif": _int_feature(acmp_dif),
+    }
+
+    return tf.train.Example(features=tf.train.Features(feature=feature))
+
+
+def _serialize_example(entry):
+    lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+    record = tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif)
+    return record.SerializeToString()
+
+
+def test_convert_to_tfrecords():
+    bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    data_rows = map(_bar_tuple_to_token_tuple, bars)
+    data_rows = filter(_filter_length, data_rows)
+    data_rows = map(_pad_tuples, data_rows)
+
+    pool = Pool()
+    with tf.io.TFRecordWriter("D:/Documents/Coding/Repository/Badura/out/dataset/test.tfrecords") as writer:
+        for example in pool.map(_serialize_example, list(data_rows)):
+            print("Writing")
+            writer.write(example)
+
+
+def test_read_tfrecords():
+    files = ["D:/Documents/Coding/Repository/Badura/out/dataset/test.tfrecords"]
+
+    raw_dataset = tf.data.TFRecordDataset(files)
+
+    feature_desc = {
+        "lead_msg": tf.io.FixedLenFeature([512], tf.int64),
+        "lead_dif": tf.io.FixedLenFeature([512], tf.int64),
+        "acmp_msg": tf.io.FixedLenFeature([512], tf.int64),
+        "acmp_dif": tf.io.FixedLenFeature([512], tf.int64),
+    }
+
+    def _parse_function(example_proto):
+        dictionary = tf.io.parse_single_example(example_proto, feature_desc)
+        return dictionary["lead_msg"], dictionary["lead_dif"], dictionary["acmp_msg"], dictionary["acmp_dif"]
+
+    ds = raw_dataset.map(_parse_function)
+
+    for batch in ds.as_numpy_iterator():
+        print(f"Batch length: {len(batch)}")
+        print(tf.shape(batch))
+        break
