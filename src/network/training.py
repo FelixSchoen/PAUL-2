@@ -21,15 +21,15 @@ class Trainer:
 
     @staticmethod
     @tf.function
-    def train_step(transformer, optimizer, train_loss, train_accuracy, mask_types, inp, tar):
-        tar_inp = tar[:, :-1]
-        tar_real = tar[:, 1:]
+    def train_step(transformer, optimizer, train_loss, train_accuracy, mask_types, inputs, target):
+        tar_inp = target[:, :-1]
+        tar_real = target[:, 1:]
 
         enc_masks = []
         dec_masks = [create_combined_mask(tar_inp)]
 
         # Create masks
-        for i, s_inp in enumerate(inp):
+        for i, s_inp in enumerate(inputs):
             enc_masks.append(create_padding_mask(s_inp))
             if mask_types[i] == MaskType.padding:
                 dec_masks.append(create_padding_mask(s_inp))
@@ -41,7 +41,7 @@ class Trainer:
                 raise UnexpectedValueException("Unknown mask type")
 
         with tf.GradientTape() as tape:
-            predictions, _ = transformer([inp, tar_inp], enc_masks, dec_masks, training=True)
+            predictions, _ = transformer([inputs, tar_inp], enc_masks, dec_masks, training=True)
             loss = loss_function(tar_real, predictions)
 
         gradients = tape.gradient(loss, transformer.trainable_variables)
@@ -49,3 +49,10 @@ class Trainer:
 
         train_loss(loss)
         train_accuracy(accuracy_function(tar_real, predictions))
+
+        return loss
+
+    @staticmethod
+    @tf.function
+    def distributed_train_step(inputs):
+        pass

@@ -30,21 +30,33 @@ def get_loss_object(strategy=None):
 
 
 def loss_function(real, pred, strategy=None):
-    mask = tf.math.logical_not(tf.math.equal(real, 0))
-    _loss = get_loss_object(strategy)(real, pred)
+    if strategy is None:
+        context = nullcontext()
+    else:
+        context = strategy.scope()
 
-    mask = tf.cast(mask, dtype=_loss.dtype)
-    _loss *= mask
+    with context:
+        mask = tf.math.logical_not(tf.math.equal(real, 0))
+        _loss = get_loss_object(strategy)(real, pred)
 
-    return tf.reduce_sum(_loss) / tf.reduce_sum(mask)
+        mask = tf.cast(mask, dtype=_loss.dtype)
+        _loss *= mask
+
+        return tf.reduce_sum(_loss) / tf.reduce_sum(mask)
 
 
-def accuracy_function(real, pred):
-    mask = tf.math.logical_not(tf.math.equal(real, 0))
+def accuracy_function(real, pred, strategy=None):
+    if strategy is None:
+        context = nullcontext()
+    else:
+        context = strategy.scope()
 
-    accuracies = tf.equal(real, tf.cast(tf.argmax(pred, axis=2), dtype=tf.int32))
-    accuracies = tf.math.logical_and(mask, accuracies)
+    with context:
+        mask = tf.math.logical_not(tf.math.equal(real, 0))
 
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    mask = tf.cast(mask, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(mask)
+        accuracies = tf.equal(real, tf.cast(tf.argmax(pred, axis=2), dtype=tf.int32))
+        accuracies = tf.math.logical_and(mask, accuracies)
+
+        accuracies = tf.cast(accuracies, dtype=tf.float32)
+        mask = tf.cast(mask, dtype=tf.float32)
+        return tf.reduce_sum(accuracies) / tf.reduce_sum(mask)
