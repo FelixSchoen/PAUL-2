@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_midi_files, Detokenizer, \
     load_oom_dataset, _bar_tuple_to_token_tuple, _filter_length, _pad_tuples
-from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
+from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, BUFFER_SIZE, SHUFFLE_SEED, BATCH_SIZE
 
 
 def test_load_sparse_midi_files():
@@ -200,16 +200,18 @@ def test_convert_to_tfrecords():
     data_rows = map(_pad_tuples, data_rows)
 
     pool = Pool()
-    with tf.io.TFRecordWriter("D:/Documents/Coding/Repository/Badura/out/dataset/test.tfrecords") as writer:
+    options = tf.io.TFRecordOptions(compression_type="GZIP")
+    with tf.io.TFRecordWriter("D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords",
+                              options=options) as writer:
         for example in pool.map(_serialize_example, list(data_rows)):
             print("Writing")
             writer.write(example)
 
 
 def test_read_tfrecords():
-    files = ["D:/Documents/Coding/Repository/Badura/out/dataset/test.tfrecords"]
+    files = ["D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords"]
 
-    raw_dataset = tf.data.TFRecordDataset(files)
+    raw_dataset = tf.data.TFRecordDataset(files, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
 
     feature_desc = {
         "lead_msg": tf.io.FixedLenFeature([512], tf.int64),
@@ -227,9 +229,11 @@ def test_read_tfrecords():
              tf.cast(dictionary["lead_msg"], dtype=tf.int16),
              ])
 
-    ds = raw_dataset.map(_parse_function).batch(16)
-
-    print(ds)
+    ds = raw_dataset.map(_parse_function) \
+        .cache() \
+        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
+        .batch(BATCH_SIZE) \
+        .prefetch(tf.data.AUTOTUNE)
 
     for batch in ds.as_numpy_iterator():
         print(f"Batch length: {len(batch)}")
