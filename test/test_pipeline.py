@@ -11,11 +11,11 @@ from src.data_processing.data_pipeline import load_stored_bars, load_dataset, lo
 from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 
-def test_load_sparse_files():
+def test_load_sparse_midi_files():
     load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
 
 
-def test_load_files():
+def test_pipeline():
     load_midi_files("D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data")
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
     ds = load_dataset(bars)
@@ -151,3 +151,21 @@ def test_save_dataset_to_file():
             print(lead_msg)
 
     print(ds.element_spec)
+
+
+def test_compare_speed_oom_normal():
+    logger = getLogger("badura." + __name__)
+
+    start_time = time.perf_counter()
+    bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    ds = load_dataset(bars)
+    list(ds)
+    del bars, ds
+    end_time = time.perf_counter()
+    logger.info(f"Time needed for loading dataset: {end_time - start_time}")
+
+    start_time = time.perf_counter()
+    ds = load_oom_dataset("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    list(ds)
+    end_time = time.perf_counter()
+    logger.info(f"Time needed for loading dataset: {end_time - start_time}")

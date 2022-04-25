@@ -1,19 +1,16 @@
-import json
-import os
-
 import tensorflow as tf
-from tensorflow.core.framework.dataset_options_pb2 import AutoShardPolicy
+from tensorflow.python.data.ops.options import AutoShardPolicy
 
-from src.data_processing.data_pipeline import load_oom_dataset
+from src.data_processing.data_pipeline import load_oom_dataset, load_stored_bars, load_dataset
+from src.util.logging import get_logger
 from src.util.util import get_project_root
 
 
 def get_strategy():
     config_file_path = get_project_root() + "/config/tensorflow.json"
 
-    with open(config_file_path, "r") as f:
-        print(json.load(f))
-        # os.environ["TF_CONFIG"] =
+    # with open(config_file_path, "r") as f:
+    #     os.environ["TF_CONFIG"] = f.read().replace("\n", "")
 
     # Use NCCL for GPUs
     communication_options = tf.distribute.experimental.CommunicationOptions(
@@ -26,15 +23,23 @@ def get_strategy():
 
 
 def train_lead():
+    logger = get_logger(__name__)
+
     strategy = get_strategy()
-    ds = load_oom_dataset()
+
+    logger.info("Loading dataset...")
+    # ds = load_oom_dataset("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+
+    bars = load_stored_bars("D:/Documents/Coding/Repository/Badura/out/pickle_sparse/compositions")
+    ds = load_dataset(bars)
 
     options = tf.data.Options()
     options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
-    ds.with_options(options)
+    ds = ds.with_options(options)
 
     distributed_ds = strategy.experimental_distribute_dataset(ds)
 
+    logger.info("Counting batches...")
     num_train_batches = len(list(distributed_ds))
 
-    print(f"There are {num_train_batches} train batches")
+    logger.info(f"Counted {num_train_batches} batches.")

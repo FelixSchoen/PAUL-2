@@ -1,13 +1,16 @@
 import time
 
 import tensorflow as tf
+from tensorflow.python.data.ops.options import AutoShardPolicy
 
-from src.data_processing.data_pipeline import load_stored_bars, load_dataset
+from src.data_processing.data_pipeline import load_stored_bars, load_dataset, load_oom_dataset
+from src.network.badura import get_strategy
 from src.network.masking import MaskType
 from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
-from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE_DIF, LEAD_OUTPUT_VOCAB_SIZE, DROPOUT_RATE, \
+from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE_DIF, LEAD_OUTPUT_VOCAB_SIZE, \
+    DROPOUT_RATE, \
     DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, PATH_CHECKPOINT_LEAD, LEAD_INPUT_VOCAB_SIZE_MLD
 
 
@@ -81,3 +84,21 @@ def test_transformer():
         print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
         print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
+
+
+def test_distributed_transformer():
+    strategy = get_strategy()
+    ds = load_oom_dataset()
+
+    options = tf.data.Options()
+    options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
+    ds.with_options(options)
+
+    distributed_ds = strategy.experimental_distribute_dataset(ds)
+
+    with strategy.scope():
+        train_loss = tf.keras.metrics.Mean(name="train_loss")
+        train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="train_accuracy")
+
+        val_loss = tf.keras.metrics.Mean(name="val_loss")
+        val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="val_accuracy")

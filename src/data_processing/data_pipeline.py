@@ -11,7 +11,8 @@ from sCoda import Composition, Bar
 
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
+    SHUFFLE_SEED
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
@@ -24,27 +25,27 @@ def load_dataset(bars: [([Bar], [Bar])]):
     # Construct dataset
     ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
         .cache() \
-        .shuffle(BUFFER_SIZE, seed=6512924) \
+        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
         .batch(BATCH_SIZE) \
         .prefetch(tf.data.AUTOTUNE)
 
     return ds
 
 
-def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, batch_size=BATCH_SIZE):
+def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH):
     # TODO drop_remainder=True ?
-    ds = tf.data.Dataset.from_generator(bar_generator_copy, output_signature=(
+    ds = tf.data.Dataset.from_generator(bar_generator, output_signature=(
         tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
     ), args=[directory]) \
         .cache() \
-        .shuffle(BUFFER_SIZE, seed=6512924) \
-        .batch(batch_size) \
+        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
+        .batch(BATCH_SIZE) \
         .prefetch(tf.data.AUTOTUNE)
 
     return ds
 
 
-def load_stored_bars(directory: str) -> [([Bar], [Bar])]:
+def load_stored_bars(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH) -> [([Bar], [Bar])]:
     """ Loads the stored bars from the given directory into memory.
 
     Args:
@@ -384,34 +385,7 @@ def _pad_tuples(tuples_to_pad):
 
 
 def bar_generator(directory):
-    files = []
-
-    # Directory given in binary
-    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
-        for filename in [f for f in filenames if f.endswith(".zip")]:
-            files.append((os.path.join(dir_path, filename), filename))
-
-    def _generator():
-        i = 0
-        while i < len(files):
-            bars = pickle_load(files[i][0])
-
-            i += 1
-            if len(bars) == 0:
-                continue
-
-            tensors = _bar_tuple_to_token_tuple(bars[0])
-
-            if not _filter_length(tensors):
-                continue
-
-            data_row = _pad_tuples(tensors)
-            yield tf.convert_to_tensor(data_row, dtype=tf.int16)  # TODO Conversion needed?
-
-    return _generator()
-
-
-def bar_generator_copy(directory):
+    logger = get_logger(__name__)
     files = []
 
     # Directory given in binary
@@ -420,10 +394,9 @@ def bar_generator_copy(directory):
             files.append((os.path.join(dir_path, filename), filename))
 
     def _bars_generator(files_list):
-        for i, file in enumerate(files_list):
-            logging.info("Start loading")
-            bars = pickle_load(files_list[i][0])
-            logging.info("Finished loading")
+        for file in files_list:
+            logger.info(f"Loading {file[0]}")
+            bars = pickle_load(file[0])
 
             if len(bars) == 0:
                 continue

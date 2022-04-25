@@ -27,8 +27,9 @@ INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
 # === Parameters ===
 # ==================
 
-BATCH_SIZE = 256
-BUFFER_SIZE = 65536
+BATCH_SIZE = 512
+SHUFFLE_SEED = 6512924  # Felix
+BUFFER_SIZE = 150000
 # How often the encoder / decoder should be stacked
 NUM_LAYERS = 4
 # Number of attention heads
