@@ -220,11 +220,22 @@ def test_read_tfrecords():
 
     def _parse_function(example_proto):
         dictionary = tf.io.parse_single_example(example_proto, feature_desc)
-        return dictionary["lead_msg"], dictionary["lead_dif"], dictionary["acmp_msg"], dictionary["acmp_dif"]
+        return tf.stack(
+            [tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             ])
 
-    ds = raw_dataset.map(_parse_function)
+    ds = raw_dataset.map(_parse_function).batch(16)
+
+    print(ds)
 
     for batch in ds.as_numpy_iterator():
         print(f"Batch length: {len(batch)}")
+        for entry in batch:
+            a, b, c, d = entry
+            print(tf.shape(tf.cast(a, dtype=tf.int16)))
+            break
         print(tf.shape(batch))
         break
