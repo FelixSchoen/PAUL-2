@@ -1,4 +1,3 @@
-import os
 import time
 
 import tensorflow as tf
@@ -11,7 +10,7 @@ from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, BATCH_SIZE
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -19,15 +18,18 @@ from src.util.util import get_src_root
 def get_strategy():
     config_file_path = get_src_root() + "/config/tensorflow.json"
 
-    with open(config_file_path, "r") as f:
-        os.environ["TF_CONFIG"] = f.read().replace("\n", "")
+    # with open(config_file_path, "r") as f:
+    #     os.environ["TF_CONFIG"] = f.read().replace("\n", "")
 
     # Use NCCL for GPUs
-    communication_options = tf.distribute.experimental.CommunicationOptions(
-        implementation=tf.distribute.experimental.CommunicationImplementation.NCCL)
+    # communication_options = tf.distribute.experimental.CommunicationOptions(
+    #     implementation=tf.distribute.experimental.CommunicationImplementation.NCCL)
+    #
+    # strategy = tf.distribute.MultiWorkerMirroredStrategy(
+    #     communication_options=communication_options)
 
-    strategy = tf.distribute.MultiWorkerMirroredStrategy(
-        communication_options=communication_options)
+    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"],
+                                              cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
 
     return strategy
 
@@ -120,7 +122,10 @@ def train_lead():
             for (batch_num, batch) in enumerate(distributed_ds):
                 lead_seqs, lead_difs = [], []
 
-                unstacked = tf.unstack(batch.values[0])
+                if hasattr(batch, "values"):
+                    unstacked = tf.unstack(batch.values[0])
+                else:
+                    unstacked = batch
 
                 for e_lead_seq, e_lead_dif, _, _ in unstacked:
                     lead_seqs.append(e_lead_seq)
