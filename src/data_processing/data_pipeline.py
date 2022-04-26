@@ -11,7 +11,7 @@ from sCoda import Composition, Bar
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
     BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED
+    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
@@ -80,7 +80,7 @@ def load_dataset_from_bars(bars: [([Bar], [Bar])]):
 
 def load_dataset_from_records(files=None):
     if files is None:
-        files = ["D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords"]
+        files = [DATA_SET_OUTPUT_FILE_PATH]
     raw_dataset = tf.data.TFRecordDataset(files, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
 
     feature_desc = {
