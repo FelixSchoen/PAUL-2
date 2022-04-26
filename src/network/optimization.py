@@ -3,9 +3,9 @@ from contextlib import nullcontext
 import tensorflow as tf
 
 
-class TransformerSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+class TransformerLearningRateSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, d_model, warmup_steps=4000):
-        super(TransformerSchedule, self).__init__()
+        super(TransformerLearningRateSchedule, self).__init__()
 
         self.d_model = tf.cast(d_model, tf.float32)
         self.warmup_steps = warmup_steps
@@ -29,15 +29,18 @@ def get_loss_object(strategy=None):
         return loss_object
 
 
-def loss_function(real, pred, strategy=None):
+def loss_function(target, prediction, strategy=None):
     if strategy is None:
         context = nullcontext()
     else:
         context = strategy.scope()
 
     with context:
-        mask = tf.math.logical_not(tf.math.equal(real, 0))
-        _loss = get_loss_object(strategy)(real, pred)
+        loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
+            from_logits=True, reduction='none')
+
+        mask = tf.math.logical_not(tf.math.equal(target, 0))
+        _loss = loss_object(target, prediction)
 
         mask = tf.cast(mask, dtype=_loss.dtype)
         _loss *= mask

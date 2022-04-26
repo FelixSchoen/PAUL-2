@@ -6,7 +6,7 @@ from tensorflow.python.data.ops.options import AutoShardPolicy
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset_from_bars, load_oom_dataset
 from src.network.badura import get_strategy
 from src.network.masking import MaskType
-from src.network.optimization import TransformerSchedule
+from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE_DIF, LEAD_OUTPUT_VOCAB_SIZE, \
@@ -29,7 +29,7 @@ def test_transformer():
     bars = load_stored_bars(DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH)
     ds = load_dataset_from_bars(bars)
 
-    learning_rate = TransformerSchedule(D_MODEL)
+    learning_rate = TransformerLearningRateSchedule(D_MODEL)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                          epsilon=1e-9)

@@ -4,7 +4,7 @@ import tensorflow as tf
 
 
 class AttentionType(Enum):
-    standard = "standard"
+    absolute = "absolute"
     relative = "relative"
 
 

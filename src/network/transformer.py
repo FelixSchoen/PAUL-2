@@ -4,11 +4,12 @@ from src.network.attention import AttentionType
 from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.positional_encoding import positional_encoding
 from src.settings import SEQUENCE_MAX_LENGTH
+from src.util.logging import get_logger
 
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, rate=0.1,
-                 attention_type=AttentionType.standard):
+                 attention_type=AttentionType.absolute):
         super(Encoder, self).__init__()
 
         self.d_model = d_model
@@ -41,7 +42,7 @@ class Encoder(tf.keras.layers.Layer):
 
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, *, num_layers, d_model, h, dff, num_encoders, target_vocab_size, rate=0.1,
-                 attention_type=AttentionType.standard):
+                 attention_type=AttentionType.absolute):
         super(Decoder, self).__init__()
 
         self.d_model = d_model
@@ -82,7 +83,7 @@ class Decoder(tf.keras.layers.Layer):
 
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, h, dff, num_encoders, input_vocab_sizes, target_vocab_size, rate=0.1,
-                 attention_type=AttentionType.standard):
+                 attention_type=AttentionType.absolute):
         super().__init__()
 
         # Setup Encoder and Decoder

@@ -7,7 +7,7 @@ from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, dff, rate=0.1, attention_type=AttentionType.standard):
+    def __init__(self, *, d_model, h, dff, rate=0.1, attention_type=AttentionType.absolute):
         super(EncoderLayer, self).__init__()
 
         self.mha = MultiHeadAttention(d_model=d_model, h=h, attention_type=attention_type)
@@ -34,7 +34,7 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 
 class DecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, dff, num_encoders, rate=0.1, attention_type=AttentionType.standard):
+    def __init__(self, *, d_model, h, dff, num_encoders, rate=0.1, attention_type=AttentionType.absolute):
         super(DecoderLayer, self).__init__()
 
         self.mha = [MultiHeadAttention(d_model=d_model, h=h, attention_type=attention_type) for _ in
@@ -74,7 +74,7 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, attention_type=AttentionType.standard,
+    def __init__(self, *, d_model, h, attention_type=AttentionType.absolute,
                  max_rel_dist=SEQUENCE_MAX_LENGTH):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
@@ -154,7 +154,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         k = self.split_heads(k)
         v = self.split_heads(v)
 
-        if self.attention_type == AttentionType.standard:
+        if self.attention_type == AttentionType.absolute:
             # Apply dot product attention
             scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
         elif self.attention_type == AttentionType.relative:

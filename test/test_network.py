@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from src.network.attention import scaled_dot_product_attention, skew, relative_scaled_dot_product_attention
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_look_ahead_mask, create_combined_mask
-from src.network.optimization import TransformerSchedule
+from src.network.optimization import TransformerLearningRateSchedule
 from src.network.positional_encoding import positional_encoding
 from src.network.transformer import Decoder, Encoder, Transformer
 from src.settings import D_MODEL
@@ -131,7 +131,7 @@ def test_transformer():
 
 
 def test_learning_schedule():
-    temp_learning_rate_schedule = TransformerSchedule(D_MODEL)
+    temp_learning_rate_schedule = TransformerLearningRateSchedule(D_MODEL)
 
     plt.plot(temp_learning_rate_schedule(tf.range(40000, dtype=tf.float32)))
     plt.ylabel('Learning Rate')

@@ -1,4 +1,5 @@
 import time
+from contextlib import nullcontext
 
 import tensorflow as tf
 from tensorflow.python.data.ops.options import AutoShardPolicy
@@ -6,7 +7,7 @@ from tensorflow.python.data.ops.options import AutoShardPolicy
 from src.data_processing.data_pipeline import load_dataset_from_records
 from src.network.attention import AttentionType
 from src.network.masking import MaskType
-from src.network.optimization import TransformerSchedule
+from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
@@ -37,9 +38,14 @@ def get_strategy():
 def train_lead():
     logger = get_logger(__name__)
 
-    strategy = get_strategy()
+    strategy = None  # get_strategy()
 
-    with strategy.scope():
+    if strategy is None:
+        context = nullcontext()
+    else:
+        context = strategy.scope()
+
+    with context:
         logger.info("Loading dataset...")
         ds = load_dataset_from_records()
 
@@ -66,14 +72,14 @@ def train_lead():
             d_model=D_MODEL,
             h=NUM_HEADS,
             dff=DFF,
-            num_encoders=1,
+            num_encoders=0,
             input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
             target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
-            attention_type=AttentionType.relative
+            attention_type=AttentionType.absolute
         )
 
         # Load learning rate
-        learning_rate = TransformerSchedule(D_MODEL)
+        learning_rate = TransformerLearningRateSchedule(D_MODEL)
 
         # Load optimizer
         optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
@@ -105,13 +111,18 @@ def train_lead():
         # val_loss = tf.keras.metrics.Mean(name="val_loss")
         # val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="val_accuracy")
 
-        epochs = 5
+        epochs = 1
+
+        trainer = Trainer(strategy, badura_lead, optimizer, train_loss, train_accuracy)
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), epochs):
-            distributed_ds = strategy.experimental_distribute_dataset(train_ds
-                                                                      .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch)
-                                                                      .prefetch(tf.data.AUTOTUNE))
+            distributed_ds = train_ds \
+                .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch) \
+                .prefetch(tf.data.AUTOTUNE)
+
+            if strategy is not None:
+                distributed_ds = strategy.experimental_distribute_dataset(distributed_ds)
 
             epoch_timer = time.time()
             batch_timer = time.time()
@@ -134,15 +145,15 @@ def train_lead():
                 lead_seq = tf.stack(lead_seqs)
                 lead_dif = tf.stack(lead_difs)
 
-                trainer = Trainer(strategy, badura_lead, optimizer, train_loss, train_accuracy)
-
-                trainer([lead_dif], lead_seq, [MaskType.padding])
+                trainer([], lead_seq, [])
 
                 logger.info(
-                    f"[E{epoch + 1:02d}B{batch_num:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
+                    f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
                     f"Time taken: {round(time.time() - batch_timer, 2)}s")
 
                 batch_timer = time.time()
+
+                break
 
             # if (epoch + 1) % 5 == 0:
             #     ckpt_save_path = ckpt_manager.save()
