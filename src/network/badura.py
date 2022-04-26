@@ -2,6 +2,7 @@ import os
 import time
 
 import tensorflow as tf
+from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.data_processing.data_pipeline import load_dataset_from_records
 from src.network.attention import AttentionType
@@ -10,7 +11,7 @@ from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, BATCH_SIZE, TRAIN_VAL_SPLIT
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -40,14 +41,22 @@ def train_lead():
         logger.info("Loading dataset...")
         ds = load_dataset_from_records()
 
-        # options = tf.data.Options()
-        # options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
-        # ds = ds.with_options(options)
+        options = tf.data.Options()
+        options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
+        ds = ds.with_options(options)
 
-        distributed_ds = strategy.experimental_distribute_dataset(ds)
+        amount_batches = len(list(ds.as_numpy_iterator()))
+        logger.info(f"Overall dataset consists of {amount_batches} batches.")
 
-        amount_batches = len(distributed_ds)
-        logger.info(f"Dataset consists of {amount_batches} batches.")
+        train_size = int(TRAIN_VAL_SPLIT * amount_batches)
+        train_ds = ds.take(train_size)
+        val_ds = ds.skip(train_size)
+
+        amount_train_batches = len(list(train_ds.as_numpy_iterator()))
+        logger.info(f"Train dataset consists of {amount_train_batches} batches.")
+
+        amount_val_batches = len(list(val_ds.as_numpy_iterator()))
+        logger.info(f"Validation dataset consists of {amount_val_batches} batches.")
 
         logger.info("Constructing model...")
         badura_lead = Transformer(
@@ -94,10 +103,17 @@ def train_lead():
         # val_loss = tf.keras.metrics.Mean(name="val_loss")
         # val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="val_accuracy")
 
-        epochs = 1
+        epochs = 5
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), epochs):
+            distributed_ds = strategy.experimental_distribute_dataset(train_ds
+                                                                      .unbatch()
+                                                                      .cache()
+                                                                      .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch)
+                                                                      .batch(BATCH_SIZE)
+                                                                      .prefetch(tf.data.AUTOTUNE))
+
             epoch_timer = time.time()
             batch_timer = time.time()
 
@@ -130,3 +146,5 @@ def train_lead():
             logger.info(f"[Epoch ended]")
             logger.info(f"[E{epoch + 1:02d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
                         f"Time taken: {round(time.time() - epoch_timer, 2)}s")
+
+            # Shuffle dataset
