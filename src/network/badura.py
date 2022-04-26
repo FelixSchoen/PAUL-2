@@ -12,11 +12,11 @@ from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD
 from src.util.logging import get_logger
-from src.util.util import get_project_root
+from src.util.util import get_src_root
 
 
 def get_strategy():
-    config_file_path = get_project_root() + "/config/tensorflow.json"
+    config_file_path = get_src_root() + "/config/tensorflow.json"
 
     with open(config_file_path, "r") as f:
         os.environ["TF_CONFIG"] = f.read().replace("\n", "")
@@ -45,6 +45,9 @@ def train_lead():
         # ds = ds.with_options(options)
 
         distributed_ds = strategy.experimental_distribute_dataset(ds)
+
+        amount_batches = len(distributed_ds)
+        logger.info(f"Dataset consists of {amount_batches} batches.")
 
         logger.info("Constructing model...")
         badura_lead = Transformer(
@@ -95,7 +98,7 @@ def train_lead():
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), epochs):
-            start = time.time()
+            epoch_timer = time.time()
             batch_timer = time.time()
 
             train_loss.reset_states()
@@ -115,7 +118,7 @@ def train_lead():
                 trainer([lead_dif], lead_seq, [MaskType.padding])
 
                 logger.info(
-                    f"[E{epoch+1:03d}B{batch_num:03d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
+                    f"[E{epoch + 1:02d}B{batch_num:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
                     f"Time taken: {round(time.time() - batch_timer, 2)}s")
 
                 batch_timer = time.time()
@@ -124,6 +127,6 @@ def train_lead():
             #     ckpt_save_path = ckpt_manager.save()
             #     print(f'Saving checkpoint for epoch {epoch + 1} at {ckpt_save_path}')
 
-            print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
-
-            print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
+            logger.info(f"[Epoch ended]")
+            logger.info(f"[E{epoch + 1:02d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
+                        f"Time taken: {round(time.time() - epoch_timer, 2)}s")

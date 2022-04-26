@@ -1,7 +1,9 @@
 # Name of the root logger
+from src.util.util import get_project_root
+
 ROOT_LOGGER = "badura"
 
-ROOT_PATH = "D:/Documents/Coding/Repository/Badura"
+ROOT_PATH = get_project_root()
 
 # Where to load raw MIDI files from
 DATA_MIDI_INPUT_PATH = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data"

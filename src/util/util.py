@@ -34,8 +34,13 @@ def flatten(lst) -> []:
     return [item for sublist in lst for item in sublist]
 
 
-def get_project_root() -> str:
+def get_src_root() -> str:
     root_path = Path(__file__).parent.parent
+    return str(root_path)
+
+
+def get_project_root() -> str:
+    root_path = Path(__file__).parent.parent.parent
     return str(root_path)
 
 
