@@ -7,7 +7,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.data_processing.data_pipeline import load_stored_bars, load_dataset_from_bars, load_midi_files, Detokenizer, \
-    load_oom_dataset
+    load_oom_dataset, load_dataset_from_records
 from src.settings import DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
 
@@ -170,3 +170,16 @@ def test_compare_speed_oom_normal():
     list(ds)
     end_time = time.perf_counter()
     logger.info(f"Time needed for loading dataset: {end_time - start_time}")
+
+
+def test_load_records_dataset():
+    ds = load_dataset_from_records()
+
+    for batch in ds.as_numpy_iterator():
+        for entry in batch:
+            print("New Entry")
+            lead_msg, lead_dif, acmp_msg, acmp_dif = entry
+            print(lead_msg)
+            print(lead_dif)
+            break
+        break

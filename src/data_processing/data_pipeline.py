@@ -94,9 +94,9 @@ def load_dataset_from_records(files=None):
         dictionary = tf.io.parse_single_example(example_proto, feature_desc)
         return tf.stack(
             [tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_msg"], dtype=tf.int16),
+             tf.cast(dictionary["lead_dif"], dtype=tf.int16),
+             tf.cast(dictionary["acmp_msg"], dtype=tf.int16),
+             tf.cast(dictionary["acmp_dif"], dtype=tf.int16),
              ])
 
     ds = raw_dataset.map(_parse_function) \

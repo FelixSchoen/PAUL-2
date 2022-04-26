@@ -11,7 +11,7 @@ from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, BATCH_SIZE, TRAIN_VAL_SPLIT
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -108,10 +108,7 @@ def train_lead():
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), epochs):
             distributed_ds = strategy.experimental_distribute_dataset(train_ds
-                                                                      .unbatch()
-                                                                      .cache()
                                                                       .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch)
-                                                                      .batch(BATCH_SIZE)
                                                                       .prefetch(tf.data.AUTOTUNE))
 
             epoch_timer = time.time()
@@ -121,8 +118,12 @@ def train_lead():
             train_accuracy.reset_states()
 
             for (batch_num, batch) in enumerate(distributed_ds):
+                print(batch)
                 lead_seqs, lead_difs = [], []
-                for e_lead_seq, e_lead_dif, _, _ in batch:
+
+                print(batch.values)
+
+                for e_lead_seq, e_lead_dif, _, _ in batch.values:
                     lead_seqs.append(e_lead_seq)
                     lead_difs.append(e_lead_dif)
 
