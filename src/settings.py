@@ -30,7 +30,7 @@ INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
 # === Parameters ===
 # ==================
 
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 # How often the encoder / decoder should be stacked

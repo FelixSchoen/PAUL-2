@@ -6,18 +6,18 @@ from src.network.optimization import loss_function, accuracy_function
 
 
 class Trainer:
-    signature = None
 
-    def __init__(self, transformer, optimizer, train_loss, train_accuracy) -> None:
+    def __init__(self, strategy, transformer, optimizer, train_loss, train_accuracy) -> None:
         super().__init__()
+        self.strategy = strategy
         self.transformer = transformer
         self.optimizer = optimizer
         self.train_loss = train_loss
         self.train_accuracy = train_accuracy
 
     def __call__(self, *args, **kwargs):
-        self.train_step(self.transformer, self.optimizer, self.train_loss, self.train_accuracy, args[2], args[0],
-                        args[1])
+        self.distributed_train_step(self.strategy, self.transformer, self.optimizer, self.train_loss,
+                                    self.train_accuracy, args[2], args[0], args[1], )
 
     @staticmethod
     @tf.function
@@ -54,5 +54,14 @@ class Trainer:
 
     @staticmethod
     @tf.function
-    def distributed_train_step(inputs):
-        pass
+    def distributed_train_step(strategy, transformer, optimizer, train_loss, train_accuracy, mask_types, inputs,
+                               target):
+        individual_loss = strategy.run(Trainer.train_step,
+                                       args=(transformer, optimizer, train_loss, train_accuracy, mask_types, inputs,
+                                             target))
+        overall_loss = strategy.reduce(tf.distribute.ReduceOp.SUM, individual_loss, axis=None)
+
+        # get metrics
+        train_loss(overall_loss)
+
+        return overall_loss
