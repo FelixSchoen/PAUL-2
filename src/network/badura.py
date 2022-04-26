@@ -11,7 +11,7 @@ from src.network.optimization import TransformerSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, BATCH_SIZE
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -118,12 +118,11 @@ def train_lead():
             train_accuracy.reset_states()
 
             for (batch_num, batch) in enumerate(distributed_ds):
-                print(batch)
                 lead_seqs, lead_difs = [], []
 
-                print(batch.values)
+                unstacked = tf.unstack(batch.values[0])
 
-                for e_lead_seq, e_lead_dif, _, _ in batch.values:
+                for e_lead_seq, e_lead_dif, _, _ in unstacked:
                     lead_seqs.append(e_lead_seq)
                     lead_difs.append(e_lead_dif)
 
