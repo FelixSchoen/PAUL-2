@@ -1,6 +1,9 @@
 import time
 
 import tensorflow as tf
+import tensorflow_datasets as tfds
+# noinspection PyUnresolvedReferences
+import tensorflow_text
 from matplotlib import pyplot as plt
 
 from src.network.attention import scaled_dot_product_attention, AttentionType, skew, \
@@ -13,7 +16,6 @@ from src.network.training import Trainer
 from src.network.transformer import Encoder, Decoder, Transformer
 from src.settings import D_MODEL, NUM_LAYERS, NUM_HEADS, DFF
 from src.util.logging import get_logger
-from testing.util import get_demo_dataset
 
 logger = get_logger(__name__)
 
@@ -97,7 +99,8 @@ def test_pointwise_feed_forward_network():
 
 
 def test_encoder_layer():
-    sample_encoder_layer = EncoderLayer(d_model=512, num_heads=8, dff=2048, attention_type=AttentionType.absolute)
+    sample_encoder_layer = EncoderLayer(d_model=512, num_heads=8, dff=2048, attention_type=AttentionType.absolute,
+                                        max_relative_distance=None)
 
     sample_encoder_layer_output = sample_encoder_layer(tf.random.uniform((64, 43, 512)), False, None)
 
@@ -110,7 +113,7 @@ def test_decoder_layer():
     sample_encoder_layer_output = test_encoder_layer()
 
     sample_decoder_layer = DecoderLayer(d_model=512, num_heads=8, dff=2048, num_encoders=1,
-                                        attention_type=AttentionType.absolute)
+                                        attention_type=AttentionType.absolute, max_relative_distance=None)
 
     sample_decoder_layer_output, _ = sample_decoder_layer(tf.random.uniform((64, 50, 512)),
                                                           [sample_encoder_layer_output], False, None, [None])
@@ -120,7 +123,7 @@ def test_decoder_layer():
 
 def test_encoder():
     sample_encoder = Encoder(num_layers=2, d_model=512, num_heads=8, dff=2048, input_vocab_size=8500,
-                             attention_type=AttentionType.absolute)
+                             attention_type=AttentionType.absolute, max_relative_distance=None)
     temp_input = tf.random.uniform((64, 62), dtype=tf.int64, minval=0, maxval=200)
 
     sample_encoder_output = sample_encoder(temp_input, training=False, mask=None)
@@ -132,7 +135,8 @@ def test_encoder():
 
 def test_decoder():
     sample_decoder = Decoder(num_layers=2, d_model=512, num_heads=8,
-                             dff=2048, target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute)
+                             dff=2048, target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute,
+                             max_relative_distance=None)
     temp_input = tf.random.uniform((64, 26), dtype=tf.int64, minval=0, maxval=200)
 
     output, attn = sample_decoder(temp_input,
@@ -147,7 +151,8 @@ def test_decoder():
 
 def test_transformer():
     sample_transformer = Transformer(num_layers=2, d_model=512, num_heads=8, dff=2048, input_vocab_sizes=[8500],
-                                     target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute)
+                                     target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute,
+                                     max_relative_distance=None)
 
     temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
     temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
@@ -226,7 +231,7 @@ def test_relative_multi_head_attention():
 
 
 def test_combined():
-    tokenizers, train_batches, val_batches, max_tokens = get_demo_dataset()
+    tokenizers, train_batches, val_batches, max_tokens = _get_demo_dataset()
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
@@ -266,3 +271,50 @@ def test_combined():
         print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
         print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
+
+
+def _get_demo_dataset():
+    examples, metadata = tfds.load('ted_hrlr_translate/pt_to_en', with_info=True, as_supervised=True)
+    train_examples, val_examples = examples['train'], examples['validation']
+
+    model_name = 'ted_hrlr_translate_pt_en_converter'
+    tf.keras.utils.get_file(
+        f'{model_name}.zip',
+        f'https://storage.googleapis.com/download.tensorflow.org/models/{model_name}.zip',
+        cache_dir="./resources/", extract=True
+    )
+
+    BUFFER_SIZE = 20000
+    BATCH_SIZE = 64
+    MAX_TOKENS = 128
+
+    tokenizers = tf.saved_model.load("./resources/datasets/" + model_name)
+
+    def filter_max_tokens(pt, en):
+        num_tokens = tf.maximum(tf.shape(pt)[1], tf.shape(en)[1])
+        return num_tokens < MAX_TOKENS
+
+    def tokenize_pairs(pt, en):
+        pt = tokenizers.pt.tokenize(pt)
+        # Convert from ragged to dense, padding with zeros.
+        pt = pt.to_tensor()
+
+        en = tokenizers.en.tokenize(en)
+        # Convert from ragged to dense, padding with zeros.
+        en = en.to_tensor()
+        return pt, en
+
+    def make_batches(ds):
+        return (
+            ds
+                .cache()
+                .shuffle(BUFFER_SIZE)
+                .batch(BATCH_SIZE)
+                .map(tokenize_pairs, num_parallel_calls=tf.data.AUTOTUNE)
+                .filter(filter_max_tokens)
+                .prefetch(tf.data.AUTOTUNE))
+
+    train_batches = make_batches(train_examples)
+    val_batches = make_batches(val_examples)
+
+    return tokenizers, train_batches, val_batches, MAX_TOKENS
