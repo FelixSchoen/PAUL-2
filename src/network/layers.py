@@ -10,7 +10,7 @@ class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, *, d_model, h, dff, rate=0.1, attention_type=AttentionType.absolute):
         super(EncoderLayer, self).__init__()
 
-        self.mha = MultiHeadAttention(d_model=d_model, h=h, attention_type=attention_type)
+        self.mha = MultiHeadAttentionOld(d_model=d_model, h=h, attention_type=attention_type)
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
 
         self.norm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
@@ -37,7 +37,7 @@ class DecoderLayer(tf.keras.layers.Layer):
     def __init__(self, *, d_model, h, dff, num_encoders, rate=0.1, attention_type=AttentionType.absolute):
         super(DecoderLayer, self).__init__()
 
-        self.mha = [MultiHeadAttention(d_model=d_model, h=h, attention_type=attention_type) for _ in
+        self.mha = [MultiHeadAttentionOld(d_model=d_model, h=h, attention_type=attention_type) for _ in
                     range(num_encoders + 1)]
 
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
@@ -74,9 +74,76 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, h, attention_type=AttentionType.absolute,
-                 max_rel_dist=SEQUENCE_MAX_LENGTH):
+    def __init__(self, *, d_model, num_heads, attention_type=AttentionType.absolute):
         super(MultiHeadAttention, self).__init__()
+
+        assert d_model % num_heads == 0
+
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.attention_type = attention_type
+
+        self.depth = self.d_model // self.num_heads
+
+        self.w_q = tf.keras.layers.Dense(d_model)
+        self.w_k = tf.keras.layers.Dense(d_model)
+        self.w_v = tf.keras.layers.Dense(d_model)
+
+        self.dense = tf.keras.layers.Dense(d_model)
+
+    def split_heads(self, x, batch_size):
+        """ Splits the given tensor into `h` different parts, which can be attended to in parallel.
+
+        Args:
+            x: The tensor to split
+            batch_size: Size of the batch
+
+        Returns: The representation after the split
+
+        """
+        x = tf.reshape(x, (batch_size, -1, self.num_heads, self.depth))
+        # TODO x = tf.reshape(x, (*x.shape[:-1], self.num_heads, self.depth))
+
+        return tf.transpose(x, perm=[0, 2, 1, 3])
+
+    def call(self, v, k, q, mask):
+        # Pipe Q, K, V through the dense layer, adds dimension d_model at the end, shape: (batch_size, seq_len, d_model)
+        q = self.w_q(q)
+        k = self.w_k(k)
+        v = self.w_v(v)
+
+        # Split Q, K, V for multi-head, adds another dimension (splits last into (h, depth))
+        batch_size = tf.shape(q)[0]
+        q = self.split_heads(q, batch_size)
+        k = self.split_heads(k, batch_size)
+        v = self.split_heads(v, batch_size)
+
+        if self.attention_type == AttentionType.absolute:
+            # Apply dot product attention
+
+            # scaled_attention Shape: (batch_size, num_heads, seq_len_q, depth)
+            # attention_weights Shape: (batch_size, num_heads, seq_len_q, seq_len_k)
+            scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+        else:
+            raise NotImplementedError
+
+        # Undo previous transposition
+        # Shape: (batch_size, seq_len_q, num_heads, depth)
+        scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])
+
+        # Concatenate heads
+        # Shape: (batch_size, seq_len_q, d_model)
+        concat_attention = tf.reshape(scaled_attention, (batch_size, -1, self.d_model))
+
+        # Shape: (batch_size, seq_len_q, d_model)
+        output = self.dense(concat_attention)
+
+        return output, attention_weights
+
+
+class MultiHeadAttentionOld(tf.keras.layers.Layer):
+    def __init__(self, *, d_model, h, attention_type=AttentionType.absolute, max_rel_dist=SEQUENCE_MAX_LENGTH):
+        super(MultiHeadAttentionOld, self).__init__()
         self.d_model = d_model
         self.h = h
         self.attention_type = attention_type
@@ -95,14 +162,6 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.E = tf.keras.layers.Embedding(self.max_len, self.d_model)
 
     def split_heads(self, x):
-        """ Splits the given tensor into `h` different parts, which can be attended to in parallel.
-
-        Args:
-            x: The tensor to split
-
-        Returns: The representation after the split
-
-        """
         # Split last dimension into (h, depth), in order to fit into multiple heads
         x = tf.reshape(x, (*x.shape[:-1], self.h, self.depth))
 

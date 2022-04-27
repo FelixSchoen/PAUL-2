@@ -6,7 +6,7 @@ def get_angles(pos, i, d_model):
     """ Calculates the angles used for the positional encoding later on.
 
     Note that since the input for the positional encoding is `2i` and `2i + 1` respectively, we have to integer
-    divide `i` by 2. This function supports matrices as input, as it uses matrix multiplication to apply the formula.
+    divide `i` by 2. This function supports tensors as input, as it uses matrix multiplication to apply the formula.
 
     Args:
         pos: Current position of the element
@@ -20,13 +20,12 @@ def get_angles(pos, i, d_model):
     return pos * angle
 
 
-def positional_encoding(max_position, d_model, dim=3):
+def positional_encoding(max_position, d_model):
     """ Calculates the positional encoding for all combinations of `(position, d_model)`.
 
     Args:
         max_position: Maximum position of the model
         d_model: Dimension of the model
-        dim: Desired dimension of the output tensor
 
     Returns: An n-dimensional tensor containing all computed values, `position` in the second-to-last dimension,
     `d_model` in the last.
@@ -43,10 +42,6 @@ def positional_encoding(max_position, d_model, dim=3):
     # Replace odd values with cosine applied to them
     angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])
 
-    pos_encoding = angle_rads
-
-    # Introduce new dimensions
-    for _ in range(dim - 2):
-        pos_encoding = pos_encoding[np.newaxis, ...]
+    pos_encoding = angle_rads[np.newaxis, ...]
 
     return tf.cast(pos_encoding, dtype=tf.float32)

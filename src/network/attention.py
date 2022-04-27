@@ -9,7 +9,6 @@ class AttentionType(Enum):
 
 
 def scaled_dot_product_attention(q, k, v, mask):
-    # TODO Removed old code, still works?
     """ Calculates the attention weights for the queries, keys and values.
 
     Input consists of queries and keys of dimension `d_k`, values of dimension `d_v`.
@@ -36,7 +35,7 @@ def scaled_dot_product_attention(q, k, v, mask):
         scaled_qk += (mask * -1e9)
 
     # Softmax on the last axis
-    attention_weights = tf.nn.softmax(scaled_qk)  # Shape: (..., seq_len_q, seq_len_k)
+    attention_weights = tf.nn.softmax(scaled_qk, axis=-1)  # Shape: (..., seq_len_q, seq_len_k)
 
     output = tf.matmul(attention_weights, v)  # Shape: (..., seq_len_q, d_k)
 

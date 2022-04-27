@@ -8,14 +8,13 @@ class MaskType(Enum):
     lookahead = "lookahead"
 
 
-def create_padding_mask(seq, dim=4):
+def create_padding_mask(seq):
     """ Creates a padding mask from the given sequence.
 
     The padding mask contains a `0` where the original sequence had values different from `0`, a `1` where it did not.
 
     Args:
         seq: The original sequence
-        dim: The desired output dimension
 
     Returns: The mask for the sequence
 
@@ -23,8 +22,8 @@ def create_padding_mask(seq, dim=4):
     # Create mask, has 1 where original had 0, 0 where original has anything else
     mask = tf.cast(tf.math.equal(seq, 0), tf.float32)
 
-    # Reshape to shape:
-    return tf.reshape(mask, (tf.shape(mask)[0], *[1 for _ in range(dim - 2)], tf.shape(mask)[-1]))
+    # Reshape to shape: batch_size, 1, 1, seq_len
+    return mask[:, tf.newaxis, tf.newaxis, :]
 
 
 def create_look_ahead_mask(size):
