@@ -1,15 +1,13 @@
 import tensorflow as tf
 
 from src.network.attention import AttentionType
-from src.network.layers import EncoderLayerOld, DecoderLayerOld
+from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.positional_encoding import positional_encoding
 from src.settings import SEQUENCE_MAX_LENGTH
-from src.util.logging import get_logger
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, h, dff, input_vocab_size, rate=0.1,
-                 attention_type=AttentionType.absolute):
+    def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_size, attention_type, rate=0.1):
         super(Encoder, self).__init__()
 
         self.d_model = d_model
@@ -18,8 +16,9 @@ class Encoder(tf.keras.layers.Layer):
         self.embedding = tf.keras.layers.Embedding(input_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, self.d_model)
 
-        self.enc_layers = [EncoderLayerOld(d_model=d_model, h=h, dff=dff, rate=rate, attention_type=attention_type)
-                           for _ in range(num_layers)]
+        self.enc_layers = [
+            EncoderLayer(d_model=d_model, num_heads=num_heads, dff=dff, attention_type=attention_type, rate=rate)
+            for _ in range(num_layers)]
 
         self.dropout = tf.keras.layers.Dropout(rate)
 
@@ -27,23 +26,74 @@ class Encoder(tf.keras.layers.Layer):
         seq_len = tf.shape(x)[1]
 
         # Embedding and Encoding
-        x = self.embedding(x)  # Shape: batch_size, input_seq_len, d_model
+
+        # Shape: (batch_size, input_seq_len, d_model)
+        x = self.embedding(x)
         x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
         x += self.pos_encoding[:, :seq_len, :]
 
+        # Apply Dropout
         x = self.dropout(x, training=training)
 
         # Apply Encoder Layers
         for i in range(self.num_layers):
             x = self.enc_layers[i](x, training, mask)
 
-        return x  # Shape: batch_size, input_seq_len, d_model
+        # Shape: (batch_size, input_seq_len, d_model)
+        return x
 
 
 class Decoder(tf.keras.layers.Layer):
+    def __init__(self, *, num_layers, d_model, num_heads, dff, target_vocab_size, num_encoders, attention_type,
+                 rate=0.1):
+        super(Decoder, self).__init__()
+
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.num_encoders = num_encoders
+
+        self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
+        self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, d_model)
+
+        self.dec_layers = [
+            DecoderLayer(d_model=d_model, num_heads=num_heads, dff=dff, num_encoders=num_encoders,
+                         attention_type=attention_type, rate=rate)
+            for _ in range(num_layers)]
+
+        self.dropout = tf.keras.layers.Dropout(rate)
+
+    def call(self, x, enc_outputs, training, self_attention_mask, enc_masks):
+        assert len(enc_outputs) == self.num_encoders
+        assert len(enc_masks) == self.num_encoders
+
+        seq_len = tf.shape(x)[1]
+        attention_weights = {}
+
+        # Embedding and Encoding
+
+        # Shape: (batch_size, target_seq_len, d_model)
+        x = self.embedding(x)
+        x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
+        x += self.pos_encoding[:, :seq_len, :]
+
+        # Apply Dropout
+        x = self.dropout(x, training=training)
+
+        # Apply Decoder Layers
+        for i in range(self.num_layers):
+            x, blocks = self.dec_layers[i](x, enc_outputs, training, self_attention_mask, enc_masks)
+
+            for j, block in enumerate(blocks):
+                attention_weights[f'decoder_layer{i + 1}_block{j + 1}'] = block
+
+        # Shape: (batch_size, target_seq_len, d_model)
+        return x, attention_weights
+
+
+class DecoderOld(tf.keras.layers.Layer):
     def __init__(self, *, num_layers, d_model, h, dff, num_encoders, target_vocab_size, rate=0.1,
                  attention_type=AttentionType.absolute):
-        super(Decoder, self).__init__()
+        super(DecoderOld, self).__init__()
 
         self.d_model = d_model
         self.num_layers = num_layers
@@ -88,11 +138,11 @@ class Transformer(tf.keras.Model):
 
         # Setup Encoder and Decoder
         self.encoders = [
-            Encoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, input_vocab_size=input_vocab_sizes[i],
-                    rate=rate, attention_type=attention_type) for i in range(num_encoders)]
+            EncoderOld(num_layers=num_layers, d_model=d_model, h=h, dff=dff, input_vocab_size=input_vocab_sizes[i],
+                       rate=rate, attention_type=attention_type) for i in range(num_encoders)]
 
-        self.decoder = Decoder(num_layers=num_layers, d_model=d_model, h=h, dff=dff, num_encoders=num_encoders,
-                               target_vocab_size=target_vocab_size, rate=rate, attention_type=attention_type)
+        self.decoder = DecoderOld(num_layers=num_layers, d_model=d_model, h=h, dff=dff, num_encoders=num_encoders,
+                                  target_vocab_size=target_vocab_size, rate=rate, attention_type=attention_type)
 
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
