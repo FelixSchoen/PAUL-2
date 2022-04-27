@@ -41,17 +41,21 @@ def get_strategy():
     return strategy
 
 
-def get_transformer(network_type):
+def get_transformer(network_type, *, strategy, optimizer, train_loss, train_accuracy):
     if network_type == NetworkType.lead:
-        return Transformer(num_layers=NUM_LAYERS,
-                    d_model=D_MODEL,
-                    num_heads=NUM_HEADS,
-                    dff=DFF,
-                    input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
-                    target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
-                    num_encoders=1,
-                    attention_type=AttentionType.relative,
-                    max_relative_distance=SEQUENCE_MAX_LENGTH)
+        transformer = Transformer(num_layers=NUM_LAYERS,
+                                  d_model=D_MODEL,
+                                  num_heads=NUM_HEADS,
+                                  dff=DFF,
+                                  input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
+                                  target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
+                                  num_encoders=1,
+                                  attention_type=AttentionType.relative,
+                                  max_relative_distance=SEQUENCE_MAX_LENGTH)
+        trainer = Trainer(transformer=transformer, optimizer=optimizer, train_loss=train_loss,
+                          train_accuracy=train_accuracy, mask_types=[MaskType.lookahead], strategy=strategy)
+
+        return transformer, trainer
     else:
         raise NotImplementedError
 
@@ -90,13 +94,19 @@ def train_network(network_type, start_epoch=0):
         logger.info(f"Validation dataset consists of {amount_val_batches} batches.")
 
         logger.info("Constructing model...")
-        transformer = get_transformer(network_type)
 
         # Load learning rate
         learning_rate = TransformerLearningRateSchedule(D_MODEL)
 
         # Load optimizer
         optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
+
+        # Loss and Accuracy
+        train_loss = tf.keras.metrics.Mean(name="train_loss")
+        train_accuracy = tf.keras.metrics.Mean(name="train_accuracy")
+
+        transformer, trainer = get_transformer(network_type, strategy=strategy, optimizer=optimizer,
+                                               train_loss=train_loss, train_accuracy=train_accuracy)
 
         # For restarting at a later epoch
         start_epoch = tf.Variable(start_epoch)
@@ -118,16 +128,10 @@ def train_network(network_type, start_epoch=0):
                 f"Restored checkpoint, will start from epoch {start_epoch.numpy()}, {optimizer.iterations.numpy()} "
                 f"iterations already completed.")
 
-        train_loss = tf.keras.metrics.Mean(name="train_loss")
-        train_accuracy = tf.keras.metrics.Mean(name="train_accuracy")
-
         # val_loss = tf.keras.metrics.Mean(name="val_loss")
         # val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="val_accuracy")
 
         epochs = 1
-
-        trainer = Trainer(transformer=transformer, optimizer=optimizer, train_loss=train_loss,
-                          train_accuracy=train_accuracy, mask_types=[MaskType.padding], strategy=strategy)
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), epochs):
@@ -161,12 +165,14 @@ def train_network(network_type, start_epoch=0):
                 lead_dif = tf.stack(lead_difs)
 
                 trainer.distributed_train_step([lead_dif], lead_seq)
+                mem_usage = tf.config.experimental.get_memory_info('GPU:0')
 
                 logger.info(
                     f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
-                    f"Time taken: {round(time.time() - batch_timer, 2)}s")
+                    f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
                 batch_timer = time.time()
+                tf.config.experimental.reset_memory_stats('GPU:0')
 
             if (epoch + 1) % 5 == 0:
                 checkpoint_save_path = checkpoint_manager.save()

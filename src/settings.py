@@ -40,16 +40,16 @@ STOP_TOKEN = 2
 # ==================
 
 TRAIN_VAL_SPLIT = 0.85
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 # How often the encoder / decoder should be stacked
-NUM_LAYERS = 4
+NUM_LAYERS = 6  # 4
 # Number of attention heads
 NUM_HEADS = 8
 # Dimension of the model
-D_MODEL = 128
+D_MODEL = 256  # 128
 # Dimension of the feed-forward network
-DFF = 512
+DFF = 1024  # 512
 # Dropout rate applied after some operations
 DROPOUT_RATE = 0.1

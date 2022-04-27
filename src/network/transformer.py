@@ -132,7 +132,10 @@ class Transformer(tf.keras.Model):
             if mask_type == MaskType.padding:
                 dec_masks.append(create_padding_mask(inp))
             else:
-                dec_masks.append(create_combined_mask(inp))
+                # Create lookahead mask, remove last entry to fit shape of input
+                dec_mask = create_combined_mask(inp)
+                dec_mask = dec_mask[:, :, :-1, :]
+                dec_masks.append(dec_mask)
 
         # Collect Encoder Outputs
         enc_outputs = []

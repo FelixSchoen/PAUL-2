@@ -76,8 +76,6 @@ def load_dataset_from_records(files=None):
 
 
 def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
-    # TODO drop_remainder=True ?
-    #         .cache() \
     ds = tf.data.Dataset.from_generator(_bar_generator, output_signature=(
         tf.TensorSpec(shape=(4, 512), dtype=D_TYPE_SEQUENCE)
     ), args=[directory]) \
