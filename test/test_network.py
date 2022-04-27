@@ -85,7 +85,7 @@ def test_split_heads():
 def test_multi_head_attention():
     temp_mha = MultiHeadAttention(d_model=512, num_heads=8, attention_type=AttentionType.absolute)
     y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
-    out, attn = temp_mha(y, k=y, q=y, mask=None)
+    out, attn = temp_mha(q=y, k=y, v=y, mask=None)
 
     logger.info(f"Output shape: {out.shape}")
     logger.info(f"Attention shape: {attn.shape}")
@@ -241,11 +241,14 @@ def test_combined():
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                          epsilon=1e-9)
 
-    transformer = Transformer(num_layers=NUM_LAYERS, d_model=D_MODEL, num_heads=NUM_HEADS, dff=DFF,
-                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy(),
-                                                 tokenizers.pt.get_vocab_size().numpy()],
-                              target_vocab_size=tokenizers.en.get_vocab_size().numpy(), num_encoders=2,
-                              attention_type=AttentionType.relative,
+    transformer = Transformer(num_layers=NUM_LAYERS,
+                              d_model=D_MODEL,
+                              num_heads=NUM_HEADS,
+                              dff=DFF,
+                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
+                              target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
+                              num_encoders=1,
+                              attention_type=AttentionType.absolute,
                               max_relative_distance=max_tokens)
 
     epochs = 1
@@ -256,11 +259,11 @@ def test_combined():
         train_loss.reset_states()
         train_accuracy.reset_states()
 
-        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, [MaskType.padding, MaskType.padding])
+        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, [MaskType.padding])
 
         # inp -> portuguese, tar -> english
         for (batch, (inp, tar)) in enumerate(train_batches):
-            trainer.train_step([inp, inp], tar)
+            trainer.train_step([inp], tar)
 
             print(
                 f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')

@@ -54,9 +54,9 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.dropout = [tf.keras.layers.Dropout(rate)
                         for _ in range(num_encoders + 2)]
 
-    def call(self, x, enc_outputs, training, self_attention_mask, enc_masks):
+    def call(self, x, enc_outputs, training, self_attention_mask, dec_masks):
         assert len(enc_outputs) == self.num_encoders
-        assert len(enc_masks) == self.num_encoders
+        assert len(dec_masks) == self.num_encoders
 
         # enc_ouputs Shapes:(batch_size, input_seq_len, d_model)
 
@@ -70,7 +70,8 @@ class DecoderLayer(tf.keras.layers.Layer):
 
         for enc_ind in range(self.num_encoders):
             # Shape: (batch_size, target_seq_len, d_model)
-            attn, attn_weights_block = self.mha[0](enc_outputs[enc_ind], enc_outputs[enc_ind], out, enc_masks[enc_ind])
+            attn, attn_weights_block = self.mha[enc_ind + 1](enc_outputs[enc_ind], enc_outputs[enc_ind], out,
+                                                             dec_masks[enc_ind])
             attn_weights.append(attn_weights_block)
             attn = self.dropout[enc_ind + 1](attn, training=training)
             # Shape: (batch_size, target_seq_len, d_model)
@@ -123,7 +124,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         t = tf.reshape(x, (*x.shape[:-1], self.num_heads, self.depth))
 
         # Setup indices for transposition
-        last_dimension_index = len(tf.shape(t)) - 1  # Note: Needs len() to work, does not work with rank() # TODO
+        last_dimension_index = len(tf.shape(t)) - 1  # Note: Needs len() to work, does not work with rank()
         prior_dimension_indices = np.arange(0, last_dimension_index - 2)
 
         # Transpose to Shape: (..., num_heads, L, depth)

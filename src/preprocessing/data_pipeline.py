@@ -11,42 +11,9 @@ from sCoda import Composition, Bar
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
     BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH
+    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
-
-
-def bar_generator(directory):
-    logger = get_logger(__name__)
-    files = []
-
-    # Directory given in binary
-    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
-        for filename in [f for f in filenames if f.endswith(".zip")]:
-            files.append((os.path.join(dir_path, filename), filename))
-
-    def _bars_generator(files_list):
-        for file in files_list:
-            logger.info(f"Loading {file[0]}")
-            bars = pickle_load(file[0])
-
-            if len(bars) == 0:
-                continue
-
-            yield bars
-
-    def _tensor_generator():
-        for bars in _bars_generator(files):
-            for bar in bars:
-                tensors = _bar_tuple_to_token_tuple(bar)
-
-                if not _filter_length(tensors):
-                    continue
-
-                data_row = _pad_tuples(tensors)
-                yield data_row
-
-    return _tensor_generator()
 
 
 def load_and_store_records(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH):
@@ -111,7 +78,7 @@ def load_dataset_from_records(files=None):
 def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
     # TODO drop_remainder=True ?
     #         .cache() \
-    ds = tf.data.Dataset.from_generator(bar_generator, output_signature=(
+    ds = tf.data.Dataset.from_generator(_bar_generator, output_signature=(
         tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
     ), args=[directory]) \
         .shuffle(buffer_size, seed=SHUFFLE_SEED) \
@@ -229,6 +196,39 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
     return bar_chunks
 
 
+def _bar_generator(directory):
+    logger = get_logger(__name__)
+    files = []
+
+    # Directory given in binary
+    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
+        for filename in [f for f in filenames if f.endswith(".zip")]:
+            files.append((os.path.join(dir_path, filename), filename))
+
+    def _bars_generator(files_list):
+        for file in files_list:
+            logger.info(f"Loading {file[0]}")
+            bars = pickle_load(file[0])
+
+            if len(bars) == 0:
+                continue
+
+            yield bars
+
+    def _tensor_generator():
+        for bars in _bars_generator(files):
+            for bar in bars:
+                tensors = _bar_tuple_to_token_tuple(bar)
+
+                if not _filter_length(tensors):
+                    continue
+
+                data_row = _pad_tuples(tensors)
+                yield data_row
+
+    return _tensor_generator()
+
+
 def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
     lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
 
@@ -256,10 +256,10 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
             dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
 
         # Add start and stop messages
-        seq.insert(0, -1)
-        dif.insert(0, -1)
-        seq.append(-2)
-        dif.append(-2)
+        seq.insert(0, START_TOKEN)
+        dif.insert(0, START_TOKEN)
+        seq.append(STOP_TOKEN)
+        dif.append(STOP_TOKEN)
 
     return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.int16), \
            tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.int16)
@@ -484,13 +484,14 @@ class Tokenizer:
     """ Tokenizer for sequences.
 
     Ranges:
-    [-2       ] ... stop
     [-1       ] ... start
     [0        ] ... padding
-    [1   - 24 ] ... wait
-    [25  - 112] ... note on
-    [113 - 200] ... note off
-    [201 - 215] ... time signature
+    [1        ] ... start
+    [2        ] ... stop
+    [3   - 26 ] ... wait
+    [27  - 114] ... note on
+    [115 - 202] ... note off
+    [203 - 217] ... time signature
 
     """
 
@@ -502,18 +503,18 @@ class Tokenizer:
         msg_type = entry["message_type"]
 
         if msg_type == "wait":
-            shifter = 1
+            shifter = 3
             value = int(entry["time"]) - 1
             self.wait_buffer += shifter + value
             return []
         elif msg_type == "note_on":
-            shifter = 1 + 24
+            shifter = 3 + 24
             value = int(entry["note"]) - 21
         elif msg_type == "note_off":
-            shifter = 1 + 24 + 88
+            shifter = 3 + 24 + 88
             value = int(entry["note"]) - 21
         elif msg_type == "time_signature":
-            shifter = 1 + 24 + 88 + 88
+            shifter = 3 + 24 + 88 + 88
             signature = (int(entry["numerator"]), int(entry["denominator"]))
             value = VALID_TIME_SIGNATURES.index(signature)
         else:
@@ -534,11 +535,11 @@ class Tokenizer:
         tokens = []
 
         while wait_buffer > 24:
-            tokens.append(1 + (24 - 1))
+            tokens.append(3 + (24 - 1))
             wait_buffer -= 24
 
         if wait_buffer > 0:
-            tokens.append(1 + (wait_buffer - 1))
+            tokens.append(3 + (wait_buffer - 1))
 
         return tokens
 
@@ -552,15 +553,15 @@ class Detokenizer:
     def detokenize(self, token):
         if token <= 0:
             return []
-        elif 1 <= token <= 24:
-            self.wait_buffer += token - 1 + 1
+        elif 3 <= token <= 26:
+            self.wait_buffer += token - 3 + 1
             return []
-        elif 25 <= token <= 112:
-            entry = {"message_type": "note_on", "note": token - 25 + 21}
-        elif 113 <= token <= 200:
-            entry = {"message_type": "note_off", "note": token - 113 + 21}
-        elif 201 <= token <= 215:
-            signature = VALID_TIME_SIGNATURES[token - 201]
+        elif 27 <= token <= 114:
+            entry = {"message_type": "note_on", "note": token - 27 + 21}
+        elif 115 <= token <= 202:
+            entry = {"message_type": "note_off", "note": token - 115 + 21}
+        elif 203 <= token <= 217:
+            signature = VALID_TIME_SIGNATURES[token - 203]
             entry = {"message_type": "time_signature", "numerator": signature[0], "denominator": signature[1]}
         else:
             raise UnexpectedValueException

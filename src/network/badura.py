@@ -4,14 +4,14 @@ from contextlib import nullcontext
 import tensorflow as tf
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
-from src.data_processing.data_pipeline import load_dataset_from_records
+from src.preprocessing.data_pipeline import load_dataset_from_records
 from src.network.attention import AttentionType
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
-from src.network.training_old import Trainer
-from src.network.transformer import TransformerOld
+from src.network.training import Trainer
+from src.network.transformer import Transformer
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -56,6 +56,7 @@ def train_lead():
         amount_batches = len(list(ds.as_numpy_iterator()))
         logger.info(f"Overall dataset consists of {amount_batches} batches.")
 
+        logger.info("Splitting into training and validation datasets...")
         train_size = int(TRAIN_VAL_SPLIT * amount_batches)
         train_ds = ds.take(train_size)
         val_ds = ds.skip(train_size)
@@ -67,23 +68,21 @@ def train_lead():
         logger.info(f"Validation dataset consists of {amount_val_batches} batches.")
 
         logger.info("Constructing model...")
-        badura_lead = TransformerOld(
-            num_layers=NUM_LAYERS,
-            d_model=D_MODEL,
-            h=NUM_HEADS,
-            dff=DFF,
-            num_encoders=0,
-            input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
-            target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
-            attention_type=AttentionType.absolute
-        )
+        badura_lead = Transformer(num_layers=NUM_LAYERS,
+                                  d_model=D_MODEL,
+                                  num_heads=NUM_HEADS,
+                                  dff=DFF,
+                                  input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
+                                  target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
+                                  num_encoders=1,
+                                  attention_type=AttentionType.relative,
+                                  max_relative_distance=SEQUENCE_MAX_LENGTH)
 
         # Load learning rate
         learning_rate = TransformerLearningRateSchedule(D_MODEL)
 
         # Load optimizer
-        optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                             epsilon=1e-9)
+        optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 
         # For restarting at a later epoch
         start_epoch = tf.Variable(0)
@@ -113,7 +112,8 @@ def train_lead():
 
         epochs = 1
 
-        trainer = Trainer(strategy, badura_lead, optimizer, train_loss, train_accuracy)
+        trainer = Trainer(transformer=badura_lead, optimizer=optimizer, train_loss=train_loss,
+                          train_accuracy=train_accuracy, mask_types=[MaskType.padding])
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), epochs):
@@ -145,7 +145,7 @@ def train_lead():
                 lead_seq = tf.stack(lead_seqs)
                 lead_dif = tf.stack(lead_difs)
 
-                trainer([], lead_seq, [])
+                trainer.train_step([lead_dif], lead_seq)
 
                 logger.info(
                     f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."

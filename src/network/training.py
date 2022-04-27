@@ -19,7 +19,7 @@ class Trainer:
         ]
 
     @staticmethod
-    @tf.function(input_signature=signature)
+    # @tf.function(input_signature=signature)
     def train_step(inputs, tar):
         tar_inp = tar[:, :-1]
         tar_real = tar[:, 1:]

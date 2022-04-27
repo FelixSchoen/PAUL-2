@@ -1,4 +1,6 @@
 # Name of the root logger
+import tensorflow as tf
+
 from src.util.util import get_project_root
 
 ROOT_LOGGER = "badura"
@@ -27,6 +29,11 @@ DIFFICULTY_VALUE_SCALE = 10
 LEAD_OUTPUT_VOCAB_SIZE = 215 + 3
 LEAD_INPUT_VOCAB_SIZE_MLD = LEAD_OUTPUT_VOCAB_SIZE
 INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
+
+# Token
+D_TYPE_SEQUENCE = tf.uint8
+START_TOKEN = 1
+STOP_TOKEN = 2
 
 # ==================
 # === Parameters ===

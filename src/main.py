@@ -1,7 +1,8 @@
 import argparse
 
-from src.data_processing.data_pipeline import load_and_store_records
 from src.network.badura import train_lead
+from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
+from src.settings import DATA_MIDI_INPUT_PATH
 from src.util.logging import get_logger
 
 
@@ -9,18 +10,21 @@ def main():
     args = parse_arguments()
     logger = get_logger(__name__)
 
-    if args.command == "train":
-        if args.train_mode == "preprocess":
-            logger.info("Preprocessing MIDI files...")
+    if args.command == "preprocess":
+        logger.info("Preprocessing MIDI files...")
 
+        if args.skip_midi:
+            logger.info("Skipping loading of MIDI files...")
+        else:
             logger.info("Loading MIDI files...")
-            # load_midi_files(DATA_MIDI_INPUT_PATH)
+            load_midi_files(DATA_MIDI_INPUT_PATH)
 
-            logger.info("Storing TFRecords...")
-            load_and_store_records()
+        logger.info("Storing TFRecords...")
+        load_and_store_records()
 
-            logger.info("Successfully processed MIDI files.")
-        elif args.train_mode == "lead":
+        logger.info("Successfully processed MIDI files.")
+    elif args.command == "train":
+        if args.network == "lead":
             logger.info("Starting training process for lead network...")
 
             train_lead()
@@ -35,11 +39,17 @@ def parse_arguments():
     subparsers = parser.add_subparsers(title="Valid Commands",
                                        help="Selects the mode of operation.")
 
+    # Preprocess Command
+    parser_train = subparsers.add_parser("preprocess", aliases=["p"], help="Preprocesses data.")
+    parser_train.set_defaults(command="preprocess")
+    parser_train.add_argument("--skip-midi", action="store_true",
+                              help="Skips processing and storing of MIDI files.")
+
     # Train Command
-    parser_train = subparsers.add_parser("train", aliases=["t"], help="Trains the networks or preprocesses data.")
+    parser_train = subparsers.add_parser("train", aliases=["t"], help="Trains the networks.")
     parser_train.set_defaults(command="train")
-    parser_train.add_argument("train_mode", choices=["preprocess", "lead"],
-                              help="Which option of the train suite to run.")
+    parser_train.add_argument("network", choices=["lead", "acmp"],
+                              help="Selects which network to train.")
 
     # Generate Command
     parser_generate = subparsers.add_parser("generate", aliases=["g"],

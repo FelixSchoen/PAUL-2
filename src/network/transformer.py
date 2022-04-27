@@ -64,9 +64,9 @@ class Decoder(tf.keras.layers.Layer):
 
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, enc_outputs, training, self_attention_mask, enc_masks):
+    def call(self, x, enc_outputs, training, self_attention_mask, dec_masks):
         assert len(enc_outputs) == self.num_encoders
-        assert len(enc_masks) == self.num_encoders
+        assert len(dec_masks) == self.num_encoders
 
         seq_len = tf.shape(x)[1]
         attention_weights = {}
@@ -83,7 +83,7 @@ class Decoder(tf.keras.layers.Layer):
 
         # Apply Decoder Layers
         for i in range(self.num_layers):
-            x, blocks = self.dec_layers[i](x, enc_outputs, training, self_attention_mask, enc_masks)
+            x, blocks = self.dec_layers[i](x, enc_outputs, training, self_attention_mask, dec_masks)
 
             for j, block in enumerate(blocks):
                 attention_weights[f'decoder_layer{i + 1}_block{j + 1}'] = block
@@ -132,8 +132,7 @@ class Transformer(tf.keras.Model):
             if mask_type == MaskType.padding:
                 dec_masks.append(create_padding_mask(inp))
             else:
-                # TODO
-                raise NotImplementedError
+                dec_masks.append(create_combined_mask(inp))
 
         # Collect Encoder Outputs
         enc_outputs = []
