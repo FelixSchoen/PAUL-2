@@ -11,7 +11,7 @@ from sCoda import Composition, Bar
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
     BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN
+    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE_SEQUENCE
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
@@ -60,10 +60,10 @@ def load_dataset_from_records(files=None):
     def _parse_function(example_proto):
         dictionary = tf.io.parse_single_example(example_proto, feature_desc)
         return tf.stack(
-            [tf.cast(dictionary["lead_msg"], dtype=tf.int16),
-             tf.cast(dictionary["lead_dif"], dtype=tf.int16),
-             tf.cast(dictionary["acmp_msg"], dtype=tf.int16),
-             tf.cast(dictionary["acmp_dif"], dtype=tf.int16),
+            [tf.cast(dictionary["lead_msg"], dtype=D_TYPE_SEQUENCE),
+             tf.cast(dictionary["lead_dif"], dtype=D_TYPE_SEQUENCE),
+             tf.cast(dictionary["acmp_msg"], dtype=D_TYPE_SEQUENCE),
+             tf.cast(dictionary["acmp_dif"], dtype=D_TYPE_SEQUENCE),
              ])
 
     ds = raw_dataset.map(_parse_function) \
@@ -79,7 +79,7 @@ def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buff
     # TODO drop_remainder=True ?
     #         .cache() \
     ds = tf.data.Dataset.from_generator(_bar_generator, output_signature=(
-        tf.TensorSpec(shape=(4, 512), dtype=tf.int16)
+        tf.TensorSpec(shape=(4, 512), dtype=D_TYPE_SEQUENCE)
     ), args=[directory]) \
         .shuffle(buffer_size, seed=SHUFFLE_SEED) \
         .batch(BATCH_SIZE) \
@@ -261,8 +261,8 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
         seq.append(STOP_TOKEN)
         dif.append(STOP_TOKEN)
 
-    return tf.convert_to_tensor(lead_seq, dtype=tf.int16), tf.convert_to_tensor(lead_dif, dtype=tf.int16), \
-           tf.convert_to_tensor(acmp_seq, dtype=tf.int16), tf.convert_to_tensor(acmp_dif, dtype=tf.int16)
+    return tf.convert_to_tensor(lead_seq, dtype=D_TYPE_SEQUENCE), tf.convert_to_tensor(lead_dif, dtype=D_TYPE_SEQUENCE), \
+           tf.convert_to_tensor(acmp_seq, dtype=D_TYPE_SEQUENCE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE_SEQUENCE)
 
 
 def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]:
