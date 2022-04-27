@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-from src.network.attention import AttentionType
 from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_combined_mask, MaskType
 from src.network.positional_encoding import positional_encoding
@@ -8,7 +7,8 @@ from src.settings import SEQUENCE_MAX_LENGTH
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_size, attention_type, rate=0.1):
+    def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_size, attention_type, max_relative_distance,
+                 rate=0.1):
         super(Encoder, self).__init__()
 
         self.d_model = d_model
@@ -18,7 +18,8 @@ class Encoder(tf.keras.layers.Layer):
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, self.d_model)
 
         self.enc_layers = [
-            EncoderLayer(d_model=d_model, num_heads=num_heads, dff=dff, attention_type=attention_type, rate=rate)
+            EncoderLayer(d_model=d_model, num_heads=num_heads, dff=dff, attention_type=attention_type,
+                         max_relative_distance=max_relative_distance, rate=rate)
             for _ in range(num_layers)]
 
         self.dropout = tf.keras.layers.Dropout(rate)
@@ -46,7 +47,7 @@ class Encoder(tf.keras.layers.Layer):
 
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, *, num_layers, d_model, num_heads, dff, target_vocab_size, num_encoders, attention_type,
-                 rate=0.1):
+                 max_relative_distance, rate=0.1):
         super(Decoder, self).__init__()
 
         self.num_layers = num_layers
@@ -58,7 +59,7 @@ class Decoder(tf.keras.layers.Layer):
 
         self.dec_layers = [
             DecoderLayer(d_model=d_model, num_heads=num_heads, dff=dff, num_encoders=num_encoders,
-                         attention_type=attention_type, rate=rate)
+                         attention_type=attention_type, max_relative_distance=max_relative_distance, rate=rate)
             for _ in range(num_layers)]
 
         self.dropout = tf.keras.layers.Dropout(rate)
@@ -93,7 +94,7 @@ class Decoder(tf.keras.layers.Layer):
 
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_sizes, target_vocab_size, num_encoders,
-                 attention_type, rate=0.1):
+                 attention_type, max_relative_distance, rate=0.1):
         super().__init__()
 
         self.num_encoders = num_encoders
@@ -102,13 +103,14 @@ class Transformer(tf.keras.Model):
 
         self.encoders = [
             Encoder(num_layers=num_layers, d_model=d_model, num_heads=num_heads, dff=dff,
-                    input_vocab_size=input_vocab_sizes[i], attention_type=attention_type, rate=rate)
+                    input_vocab_size=input_vocab_sizes[i], attention_type=attention_type,
+                    max_relative_distance=max_relative_distance, rate=rate)
             for i in range(num_encoders)
         ]
 
         self.decoder = Decoder(num_layers=num_layers, d_model=d_model, num_heads=num_heads, dff=dff,
                                target_vocab_size=target_vocab_size, num_encoders=num_encoders,
-                               attention_type=attention_type, rate=rate)
+                               attention_type=attention_type, max_relative_distance=max_relative_distance, rate=rate)
 
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
@@ -146,4 +148,3 @@ class Transformer(tf.keras.Model):
         final_output = self.final_layer(dec_output)
 
         return final_output, attention_weights
-

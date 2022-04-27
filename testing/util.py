@@ -48,4 +48,4 @@ def get_demo_dataset():
     train_batches = make_batches(train_examples)
     val_batches = make_batches(val_examples)
 
-    return tokenizers, train_batches, val_batches
+    return tokenizers, train_batches, val_batches, MAX_TOKENS

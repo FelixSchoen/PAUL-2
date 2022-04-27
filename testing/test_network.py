@@ -3,9 +3,10 @@ import time
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.network.attention import scaled_dot_product_attention, AttentionType
+from src.network.attention import scaled_dot_product_attention, AttentionType, skew, \
+    relative_scaled_dot_product_attention
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
-from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType
+from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType, create_combined_mask
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.positional_encoding import positional_encoding
 from src.network.training import Trainer
@@ -69,6 +70,14 @@ def test_scaled_dot_product_attention():
     temp_out, temp_attn = scaled_dot_product_attention(temp_q, temp_k, temp_v, None)
     logger.info(f"Attention: {temp_attn}")
     logger.info(f"Output: {temp_out}")
+
+
+def test_split_heads():
+    t = tf.random.normal((64, 10, 200))
+
+    mha = MultiHeadAttention(num_heads=8, d_model=200, attention_type=AttentionType.absolute)
+
+    logger.info(f"Split: {tf.shape(mha.split_heads(t))}")
 
 
 def test_multi_head_attention():
@@ -156,8 +165,68 @@ def test_learning_rate():
     plt.xlabel('Train Step')
 
 
+def test_skew():
+    u = tf.constant([[0, 1, 1, 0, 2],
+                     [1, 0, 0, 3, 2],
+                     [1, 1, 5, 3, 2],
+                     [0, 7, 5, 3, 2],
+                     [9, 7, 5, 3, 2]], dtype=tf.float32)
+
+    plots = [u, skew(u)]
+
+    fig = plt.figure(figsize=(10, 6.5))
+    rows = 1
+    cols = 2
+    labels = ['u', 'skew(u)']
+
+    for i in range(rows * cols):
+        fig.add_subplot(1, 2, i + 1).set_title(labels[i], fontsize=14)
+        plt.imshow(plots[i], cmap='viridis')
+    fig.tight_layout()
+    plt.show()
+
+
+def test_relative_scaled_dot_product_attention():
+    temp_k = tf.constant([[0, 0, 10], [0, 10, 0], [10, 0, 0], [10, 0, 0]], dtype=tf.float32)
+    temp_v = tf.constant([[4, 2, 1], [5, 6, 3], [7, 8, 10], [9, 12, 45]], dtype=tf.float32)
+    temp_e = tf.zeros_like(temp_k)  # zero the relative position embeddings to demonstrate original attention
+
+    temp_q = tf.constant([[0, 10, 0]], dtype=tf.float32)
+    attn, attn_weights = relative_scaled_dot_product_attention(temp_q, temp_k, temp_v, temp_e, None)
+
+    logger.info(f"Attention: {attn}")
+    logger.info(f"Weights: {attn_weights}")
+
+    # Relative embeddings change outcome:
+    temp_q = tf.constant([[0, 10, 0]], dtype=tf.float32)  # aligns with second key
+
+    temp_e = tf.constant([[-1, -1, -10], [2, 2, 2], [1, 1, 1], [4, 4, 4]], dtype=tf.float32)
+
+    attn, attn_weights = relative_scaled_dot_product_attention(temp_q, temp_k, temp_v, temp_e, None)
+
+    logger.info(f"Attention: {attn}")
+    logger.info(f"Weights: {attn_weights}")
+
+
+def test_embeddings():
+    E = tf.keras.layers.Embedding(400, 200)
+    logger.info(f"Shape: {MultiHeadAttention.get_embeddings(E, 500, None).shape}")
+
+
+def test_relative_multi_head_attention():
+    # Create a MultiHeadAttention Block to test
+    t = tf.random.uniform((10, 1500, 256))
+    mha = MultiHeadAttention(d_model=256, num_heads=8, attention_type=AttentionType.relative,
+                             max_relative_distance=1921)
+    out, attn = mha(t, t, t, create_combined_mask(tf.random.uniform((10, 1500))))
+
+    logger.info(f"Output Shape: {out.shape}")
+    logger.info(f"Attention Shape: {attn.shape}")
+    logger.info(f"Trainable variables: {len(mha.trainable_variables)}")
+
+
 def test_combined():
-    tokenizers, train_batches, val_batches = get_demo_dataset()
+    tokenizers, train_batches, val_batches, max_tokens = get_demo_dataset()
 
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
@@ -168,9 +237,11 @@ def test_combined():
                                          epsilon=1e-9)
 
     transformer = Transformer(num_layers=NUM_LAYERS, d_model=D_MODEL, num_heads=NUM_HEADS, dff=DFF,
-                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
-                              target_vocab_size=tokenizers.en.get_vocab_size().numpy(), num_encoders=1,
-                              attention_type=AttentionType.absolute)
+                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy(),
+                                                 tokenizers.pt.get_vocab_size().numpy()],
+                              target_vocab_size=tokenizers.en.get_vocab_size().numpy(), num_encoders=2,
+                              attention_type=AttentionType.relative,
+                              max_relative_distance=max_tokens)
 
     epochs = 1
 
@@ -180,11 +251,11 @@ def test_combined():
         train_loss.reset_states()
         train_accuracy.reset_states()
 
-        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, [MaskType.padding])
+        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, [MaskType.padding, MaskType.padding])
 
         # inp -> portuguese, tar -> english
         for (batch, (inp, tar)) in enumerate(train_batches):
-            trainer.train_step([inp], tar)
+            trainer.train_step([inp, inp], tar)
 
             print(
                 f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')

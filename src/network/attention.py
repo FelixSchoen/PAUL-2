@@ -35,9 +35,12 @@ def scaled_dot_product_attention(q, k, v, mask):
         scaled_qk += (mask * -1e9)
 
     # Softmax on the last axis
-    attention_weights = tf.nn.softmax(scaled_qk, axis=-1)  # Shape: (..., seq_len_q, seq_len_k)
 
-    output = tf.matmul(attention_weights, v)  # Shape: (..., seq_len_q, d_k)
+    # Shape: (..., seq_len_q, seq_len_k)
+    attention_weights = tf.nn.softmax(scaled_qk, axis=-1)
+
+    # Shape: (..., seq_len_q, d_k)
+    output = tf.matmul(attention_weights, v)
 
     return output, attention_weights
 
@@ -57,8 +60,10 @@ def relative_scaled_dot_product_attention(q, k, v, e, mask):
     Returns: The calculated attention weights
 
     """
-    matmul_qk = tf.matmul(q, k, transpose_b=True)  # Shape: (..., seq_len_q, seq_len_k)
-    s_rel = skew(tf.matmul(q, e, transpose_b=True))  # Shape: (..., seq_len_q, seq_len_k)
+    # Shape: (..., seq_len_q, seq_len_k)
+    matmul_qk = tf.matmul(q, k, transpose_b=True)
+    # Shape: (..., seq_len_q, seq_len_k)
+    s_rel = skew(tf.matmul(q, e, transpose_b=True))
 
     # Scale by root of d_k, in order to optimize softmax
     d_k = tf.cast(tf.shape(k)[-1], tf.float32)
@@ -70,9 +75,12 @@ def relative_scaled_dot_product_attention(q, k, v, e, mask):
         scaled_qk += (mask * -1e9)
 
     # Softmax on the last axis
-    attention_weights = tf.nn.softmax(scaled_qk)  # Shape: (..., seq_len_q, seq_len_k)
 
-    output = tf.matmul(attention_weights, v)  # Shape: (..., seq_len_q, d_k)
+    # Shape: (..., seq_len_q, seq_len_k)
+    attention_weights = tf.nn.softmax(scaled_qk, axis=-1)
+
+    # Shape: (..., seq_len_q, d_k)
+    output = tf.matmul(attention_weights, v)
 
     return output, attention_weights
 
@@ -92,6 +100,8 @@ def skew(t: tf.Tensor):
 
     # Reshape
     s_rel = tf.reshape(padded, (-1, padded.shape[-1], padded.shape[-2]))
+
     # Slice
     s_rel = s_rel[:, 1:]
+
     return tf.cast(tf.reshape(s_rel, t.shape), t.dtype)
