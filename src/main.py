@@ -1,6 +1,6 @@
 import argparse
 
-from src.network.badura import train_lead
+from src.network.badura import train_network, NetworkType
 from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
 from src.settings import DATA_MIDI_INPUT_PATH
 from src.util.logging import get_logger
@@ -27,7 +27,7 @@ def main():
         if args.network == "lead":
             logger.info("Starting training process for lead network...")
 
-            train_lead()
+            train_network(network_type=NetworkType.lead)
 
             logger.info("Successfully trained lead network.")
     elif args.command == "generate":

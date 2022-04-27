@@ -40,7 +40,7 @@ STOP_TOKEN = 2
 # ==================
 
 TRAIN_VAL_SPLIT = 0.85
-BATCH_SIZE = 16
+BATCH_SIZE = 128
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 # How often the encoder / decoder should be stacked

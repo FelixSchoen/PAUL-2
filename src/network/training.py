@@ -1,12 +1,14 @@
 import tensorflow as tf
 
 from src.network.optimization import accuracy_function, loss_function
+from src.settings import D_TYPE_SEQUENCE
 
 
 class Trainer:
-    transformer, optimizer, train_loss, train_accuracy, mask_types, signature = None, None, None, None, None, None
+    strategy, transformer, optimizer, train_loss, train_accuracy, mask_types, signature = None, None, None, None, None, None, None
 
-    def __init__(self, transformer, optimizer, train_loss, train_accuracy, mask_types):
+    def __init__(self, transformer, optimizer, train_loss, train_accuracy, mask_types, *, strategy):
+        Trainer.strategy = strategy
         Trainer.transformer = transformer
         Trainer.optimizer = optimizer
         Trainer.train_loss = train_loss
@@ -14,15 +16,15 @@ class Trainer:
         Trainer.mask_types = mask_types
 
         Trainer.signature = [
-            tf.TensorSpec(shape=(None, None), dtype=tf.int64),
-            tf.TensorSpec(shape=(None, None), dtype=tf.int64),
+            tf.TensorSpec(shape=(None,), dtype=D_TYPE_SEQUENCE),
+            tf.TensorSpec(shape=(None,), dtype=D_TYPE_SEQUENCE),
         ]
 
     @staticmethod
-    # @tf.function(input_signature=signature)
-    def train_step(inputs, tar):
-        tar_inp = tar[:, :-1]
-        tar_real = tar[:, 1:]
+    @tf.function  # (input_signature=signature)
+    def train_step(inputs, target):
+        tar_inp = target[:, :-1]
+        tar_real = target[:, 1:]
 
         with tf.GradientTape() as tape:
             predictions, _ = Trainer.transformer([inputs, tar_inp],
@@ -35,3 +37,16 @@ class Trainer:
 
         Trainer.train_loss(loss)
         Trainer.train_accuracy(accuracy_function(tar_real, predictions))
+
+        return loss
+
+    @staticmethod
+    @tf.function
+    def distributed_train_step(inputs, target):
+        per_replica_losses = Trainer.strategy.run(Trainer.train_step,
+                                                  args=(inputs, target))
+        overall_loss = Trainer.strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses, axis=None)
+
+        Trainer.train_loss(overall_loss)
+
+        return overall_loss
