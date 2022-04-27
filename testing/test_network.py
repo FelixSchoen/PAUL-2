@@ -1,12 +1,18 @@
+import time
+
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.network.attention import scaled_dot_product_attention, AttentionType
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType
+from src.network.optimization import TransformerLearningRateSchedule
 from src.network.positional_encoding import positional_encoding
+from src.network.training import Trainer
 from src.network.transformer import Encoder, Decoder, Transformer
+from src.settings import D_MODEL, NUM_LAYERS, NUM_HEADS, DFF
 from src.util.logging import get_logger
+from testing.util import get_demo_dataset
 
 logger = get_logger(__name__)
 
@@ -140,3 +146,52 @@ def test_transformer():
     fn_out, _ = sample_transformer([[temp_input], temp_target], training=False, mask_types=[MaskType.padding])
 
     logger.info(f"Shape: {fn_out.shape}")
+
+
+def test_learning_rate():
+    temp_learning_rate_schedule = TransformerLearningRateSchedule(D_MODEL)
+
+    plt.plot(temp_learning_rate_schedule(tf.range(40000, dtype=tf.float32)))
+    plt.ylabel('Learning Rate')
+    plt.xlabel('Train Step')
+
+
+def test_combined():
+    tokenizers, train_batches, val_batches = get_demo_dataset()
+
+    train_loss = tf.keras.metrics.Mean(name='train_loss')
+    train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
+
+    learning_rate = TransformerLearningRateSchedule(D_MODEL)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+                                         epsilon=1e-9)
+
+    transformer = Transformer(num_layers=NUM_LAYERS, d_model=D_MODEL, num_heads=NUM_HEADS, dff=DFF,
+                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
+                              target_vocab_size=tokenizers.en.get_vocab_size().numpy(), num_encoders=1,
+                              attention_type=AttentionType.absolute)
+
+    epochs = 1
+
+    for epoch in range(epochs):
+        start = time.time()
+
+        train_loss.reset_states()
+        train_accuracy.reset_states()
+
+        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, [MaskType.padding])
+
+        # inp -> portuguese, tar -> english
+        for (batch, (inp, tar)) in enumerate(train_batches):
+            trainer.train_step([inp], tar)
+
+            print(
+                f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
+
+            if batch == 2:
+                break
+
+        print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
+
+        print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')

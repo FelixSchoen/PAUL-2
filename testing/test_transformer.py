@@ -7,7 +7,7 @@ from src.data_processing.data_pipeline import load_stored_bars, load_dataset_fro
 from src.network.badura import get_strategy
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
-from src.network.training import Trainer
+from src.network.training_old import Trainer
 from src.network.transformer import TransformerOld
 from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE_DIF, LEAD_OUTPUT_VOCAB_SIZE, \
     DROPOUT_RATE, \

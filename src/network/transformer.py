@@ -147,37 +147,3 @@ class Transformer(tf.keras.Model):
 
         return final_output, attention_weights
 
-
-class TransformerOld(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, h, dff, num_encoders, input_vocab_sizes, target_vocab_size, rate=0.1,
-                 attention_type=AttentionType.absolute):
-        super().__init__()
-
-        # Setup Encoder and Decoder
-        self.encoders = [
-            EncoderOld(num_layers=num_layers, d_model=d_model, h=h, dff=dff, input_vocab_size=input_vocab_sizes[i],
-                       rate=rate, attention_type=attention_type) for i in range(num_encoders)]
-
-        self.decoder = DecoderOld(num_layers=num_layers, d_model=d_model, h=h, dff=dff, num_encoders=num_encoders,
-                                  target_vocab_size=target_vocab_size, rate=rate, attention_type=attention_type)
-
-        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
-
-    def call(self, input, enc_masks, dec_masks, training):
-        assert len(enc_masks) == len(self.encoders)
-        assert len(dec_masks) == len(self.encoders) + 1
-
-        # Keras models prefer if you pass all your inputs in the first argument
-        inputs, target = input
-
-        # Collect encoder outputs
-        enc_outputs = []
-        for i, encoder in enumerate(self.encoders):
-            enc_outputs.append(encoder(inputs[i], training, enc_masks[i]))  # Shape: batch_size, inp_seq_len, d_model
-
-        # Shape: batch_size, tar_seq_len, d_model
-        dec_output, attention_weights = self.decoder(target, enc_outputs, training, dec_masks)
-
-        final_output = self.final_layer(dec_output)  # Shape: batch_size, tar_seq_len, target_vocab_size
-
-        return final_output, attention_weights

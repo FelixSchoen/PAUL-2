@@ -8,7 +8,7 @@ from src.data_processing.data_pipeline import load_dataset_from_records
 from src.network.attention import AttentionType
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
-from src.network.training import Trainer
+from src.network.training_old import Trainer
 from src.network.transformer import TransformerOld
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT
