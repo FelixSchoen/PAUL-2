@@ -9,7 +9,7 @@ from src.network.attention import AttentionType
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
-from src.network.transformer import Transformer
+from src.network.transformer import TransformerOld
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT
 from src.util.logging import get_logger
@@ -67,7 +67,7 @@ def train_lead():
         logger.info(f"Validation dataset consists of {amount_val_batches} batches.")
 
         logger.info("Constructing model...")
-        badura_lead = Transformer(
+        badura_lead = TransformerOld(
             num_layers=NUM_LAYERS,
             d_model=D_MODEL,
             h=NUM_HEADS,

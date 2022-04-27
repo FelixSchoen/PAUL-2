@@ -8,14 +8,14 @@ from src.network.badura import get_strategy
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
-from src.network.transformer import Transformer
+from src.network.transformer import TransformerOld
 from src.settings import D_MODEL, NUM_HEADS, DFF, NUM_LAYERS, INPUT_VOCAB_SIZE_DIF, LEAD_OUTPUT_VOCAB_SIZE, \
     DROPOUT_RATE, \
     DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, PATH_CHECKPOINT_LEAD, LEAD_INPUT_VOCAB_SIZE_MLD
 
 
 def test_transformer():
-    transformer = Transformer(
+    transformer = TransformerOld(
         num_layers=NUM_LAYERS,
         d_model=D_MODEL,
         h=NUM_HEADS,

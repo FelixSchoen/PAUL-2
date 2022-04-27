@@ -40,7 +40,7 @@ def create_look_ahead_mask(size):
     return tf.cast(mask, tf.float32)
 
 
-def create_combined_mask(seq, dim=4):
+def create_combined_mask(seq):
     """ Creates a mask that encompasses both the padding and lookahead mask.
 
     Args:
@@ -50,7 +50,7 @@ def create_combined_mask(seq, dim=4):
     Returns: The combined mask
 
     """
-    padding_mask = create_padding_mask(seq, dim)
+    padding_mask = create_padding_mask(seq)
     lookahead_mask = create_look_ahead_mask(tf.shape(seq)[-1])
 
     return tf.maximum(padding_mask, lookahead_mask)

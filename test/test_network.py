@@ -3,9 +3,9 @@ from matplotlib import pyplot as plt
 
 from src.network.attention import scaled_dot_product_attention, AttentionType
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
-from src.network.masking import create_padding_mask, create_look_ahead_mask
+from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType
 from src.network.positional_encoding import positional_encoding
-from src.network.transformer import Encoder, Decoder
+from src.network.transformer import Encoder, Decoder, Transformer
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
@@ -128,3 +128,15 @@ def test_decoder():
 
     logger.info(f"Output Shape: {output.shape}")
     logger.info(f"Attention Shape: {attn['decoder_layer2_block2'].shape}")
+
+
+def test_transformer():
+    sample_transformer = Transformer(num_layers=2, d_model=512, num_heads=8, dff=2048, input_vocab_sizes=[8500],
+                                     target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute)
+
+    temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
+    temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
+
+    fn_out, _ = sample_transformer([[temp_input], temp_target], training=False, mask_types=[MaskType.padding])
+
+    logger.info(f"Shape: {fn_out.shape}")
