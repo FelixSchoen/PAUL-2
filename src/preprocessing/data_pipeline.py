@@ -503,9 +503,8 @@ class Tokenizer:
         msg_type = entry["message_type"]
 
         if msg_type == "wait":
-            shifter = 3
-            value = int(entry["time"]) - 1
-            self.wait_buffer += shifter + value
+            value = int(entry["time"])
+            self.wait_buffer += value
             return []
         elif msg_type == "note_on":
             shifter = 3 + 24
@@ -551,7 +550,7 @@ class Detokenizer:
         self.wait_buffer = 0
 
     def detokenize(self, token):
-        if token <= 0:
+        if token <= 2:
             return []
         elif 3 <= token <= 26:
             self.wait_buffer += token - 3 + 1
