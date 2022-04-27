@@ -1,8 +1,8 @@
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.network.attention import scaled_dot_product_attention
-from src.network.layers import MultiHeadAttention
+from src.network.attention import scaled_dot_product_attention, AttentionType
+from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_look_ahead_mask
 from src.network.positional_encoding import positional_encoding
 from src.util.logging import get_logger
@@ -65,12 +65,41 @@ def test_scaled_dot_product_attention():
 
 
 def test_multi_head_attention():
-    temp_mha = MultiHeadAttention(d_model=512, num_heads=8)
+    temp_mha = MultiHeadAttention(d_model=512, num_heads=8, attention_type=AttentionType.absolute)
     y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
     out, attn = temp_mha(y, k=y, q=y, mask=None)
 
     logger.info(f"Output shape: {out.shape}")
     logger.info(f"Attention shape: {attn.shape}")
+
+
+def test_pointwise_feed_forward_network():
+    sample_ffn = PointwiseFeedForwardNetwork(d_model=512, dff=2048)
+    shape = sample_ffn(tf.random.uniform((64, 50, 512))).shape
+
+    logger.info(f"Shape: {shape}")
+
+
+def test_encoder_layer():
+    sample_encoder_layer = EncoderLayer(d_model=512, num_heads=8, dff=2048, attention_type=AttentionType.absolute)
+
+    sample_encoder_layer_output = sample_encoder_layer(tf.random.uniform((64, 43, 512)), False, None)
+
+    logger.info(f"Shape: {sample_encoder_layer_output.shape}")
+
+    return sample_encoder_layer_output
+
+
+def test_decoder_layer():
+    sample_encoder_layer_output = test_encoder_layer()
+
+    sample_decoder_layer = DecoderLayer(d_model=512, num_heads=8, dff=2048, num_encoders=1,
+                                        attention_type=AttentionType.absolute)
+
+    sample_decoder_layer_output, _ = sample_decoder_layer(tf.random.uniform((64, 50, 512)),
+                                                          [sample_encoder_layer_output], False, None, [None])
+
+    logger.info(f"Shape: {sample_decoder_layer_output.shape}")
 
 #
 # def test_padding_masks():

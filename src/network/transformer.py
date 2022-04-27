@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from src.network.attention import AttentionType
-from src.network.layers import EncoderLayer, DecoderLayer
+from src.network.layers import EncoderLayerOld, DecoderLayerOld
 from src.network.positional_encoding import positional_encoding
 from src.settings import SEQUENCE_MAX_LENGTH
 from src.util.logging import get_logger
@@ -18,7 +18,7 @@ class Encoder(tf.keras.layers.Layer):
         self.embedding = tf.keras.layers.Embedding(input_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, self.d_model)
 
-        self.enc_layers = [EncoderLayer(d_model=d_model, h=h, dff=dff, rate=rate, attention_type=attention_type)
+        self.enc_layers = [EncoderLayerOld(d_model=d_model, h=h, dff=dff, rate=rate, attention_type=attention_type)
                            for _ in range(num_layers)]
 
         self.dropout = tf.keras.layers.Dropout(rate)
@@ -52,8 +52,8 @@ class Decoder(tf.keras.layers.Layer):
         self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.pos_encoding = positional_encoding(SEQUENCE_MAX_LENGTH, d_model)
 
-        self.dec_layers = [DecoderLayer(d_model=d_model, h=h, dff=dff, num_encoders=num_encoders, rate=rate,
-                                        attention_type=attention_type)
+        self.dec_layers = [DecoderLayerOld(d_model=d_model, h=h, dff=dff, num_encoders=num_encoders, rate=rate,
+                                           attention_type=attention_type)
                            for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
