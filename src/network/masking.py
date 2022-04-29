@@ -40,17 +40,31 @@ def create_look_ahead_mask(size):
     return tf.cast(mask, tf.float32)
 
 
-def create_combined_mask(seq):
+def create_single_out_mask(size):
+    """ Creates a tensor with an upper and lower triangular matrix full of `1`s.
+
+    Args:
+        size: Size of the mask
+
+    Returns: The mask
+
+    """
+    # Copies the ones, setting the diagonal to 0
+    mask = 1 - tf.linalg.band_part(tf.ones((size, size)), 0, 0)
+    return tf.cast(mask, tf.float32)
+
+
+def create_combined_mask(seq, mask_fn=create_look_ahead_mask):
     """ Creates a mask that encompasses both the padding and lookahead mask.
 
     Args:
         seq: The sequence to create the mask for
-        dim: The desired output dimension
+        mask_fn: A function yielding a mask
 
     Returns: The combined mask
 
     """
     padding_mask = create_padding_mask(seq)
-    lookahead_mask = create_look_ahead_mask(tf.shape(seq)[-1])
+    lookahead_mask = mask_fn(tf.shape(seq)[-1])
 
     return tf.maximum(padding_mask, lookahead_mask)

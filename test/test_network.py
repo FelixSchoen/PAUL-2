@@ -9,12 +9,13 @@ from matplotlib import pyplot as plt
 from src.network.attention import scaled_dot_product_attention, AttentionType, skew, \
     relative_scaled_dot_product_attention
 from src.network.layers import MultiHeadAttention, PointwiseFeedForwardNetwork, EncoderLayer, DecoderLayer
-from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType, create_combined_mask
+from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType, create_combined_mask, \
+    create_single_out_mask
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.positional_encoding import positional_encoding
 from src.network.training import Trainer
 from src.network.transformer import Encoder, Decoder, Transformer
-from src.settings import D_MODEL, NUM_LAYERS, NUM_HEADS, DFF
+from src.settings import D_MODEL
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
@@ -44,6 +45,13 @@ def test_padding_mask():
 def test_look_ahead_mask():
     x = tf.random.uniform((1, 3))
     logger.info(f"Look ahead mask: {create_look_ahead_mask(x.shape[1])}")
+
+
+def test_single_out_mask():
+    x = tf.random.uniform((1, 3))
+    logger.info(f"Single out mask: {create_single_out_mask(x.shape[1])}")
+    plt.matshow(create_single_out_mask(5))
+    plt.show()
 
 
 def test_scaled_dot_product_attention():
