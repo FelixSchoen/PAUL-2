@@ -15,6 +15,7 @@ DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH = DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLD
 DATA_SET_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data.tfrecords"
 
 PATH_CHECKPOINT_LEAD = ROOT_PATH + "/out/badura/checkpoint"
+PATH_TENSORBOARD = ROOT_PATH + "/out/tensorboard"
 
 # Length of tensors representing sequences
 SEQUENCE_MAX_LENGTH = 512

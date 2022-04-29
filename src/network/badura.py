@@ -1,6 +1,7 @@
 import os
 import time
 from contextlib import nullcontext
+from datetime import datetime
 from enum import Enum
 
 import tensorflow as tf
@@ -13,7 +14,8 @@ from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.preprocessing.data_pipeline import load_dataset_from_records
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
+    PATH_TENSORBOARD
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -126,6 +128,11 @@ def train_network(network_type, start_epoch=0):
 
         checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=10)
 
+        # Tensorboard setup
+        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+        train_log_dir = PATH_TENSORBOARD + "/" + current_time + '/train'
+        train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+
         # If checkpoint exists, restore it
         if checkpoint_manager.latest_checkpoint:
             checkpoint.restore(checkpoint_manager.latest_checkpoint)
@@ -169,10 +176,15 @@ def train_network(network_type, start_epoch=0):
                 else:
                     trainer.train_step([lead_dif], lead_seq)
 
+                # Tensorboard
+                with train_summary_writer.as_default():
+                    tf.summary.scalar("train_loss", train_loss.result(), step=optimizer.iterations)
+                    tf.summary.scalar("train_accuracy"" ", train_accuracy.result(), step=optimizer.iterations)
+
                 mem_usage = tf.config.experimental.get_memory_info('GPU:0')
 
                 logger.info(
-                    f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}."
+                    f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
                     f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
                 batch_timer = time.time()
