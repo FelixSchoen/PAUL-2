@@ -27,19 +27,8 @@ def get_strategy():
     config_file_path = get_src_root() + "/config/tensorflow.json"
 
     with open(config_file_path, "r") as f:
-        os.environ["TF_CONFIG"] = f.read().replace("\n", "")
-
-    gpus = tf.config.list_physical_devices('GPU')
-    if gpus:
-        try:
-            # Currently, memory growth needs to be the same across GPUs
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-            logical_gpus = tf.config.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-        except RuntimeError as e:
-            # Memory growth must be set before GPUs have been initialized
-            print(e)
+        # os.environ["TF_CONFIG"] = f.read().replace("\n", "")
+        os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
     # Use NCCL for GPUs
     communication_options = tf.distribute.experimental.CommunicationOptions(
@@ -47,9 +36,6 @@ def get_strategy():
 
     strategy = tf.distribute.MultiWorkerMirroredStrategy(
         communication_options=communication_options)
-
-    # strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"],
-    #                                           cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
 
     return strategy
 
@@ -85,6 +71,9 @@ def train_network(network_type, start_epoch=0):
         context = strategy.scope()
 
     with context:
+        logical_gpus = tf.config.list_logical_devices("GPU")
+        logger.info(f"Running with {logical_gpus} virtual GPUs...")
+
         logger.info("Loading dataset...")
         ds = load_dataset_from_records()
 
@@ -175,7 +164,11 @@ def train_network(network_type, start_epoch=0):
                 lead_seq = tf.stack(lead_seqs)
                 lead_dif = tf.stack(lead_difs)
 
-                trainer.distributed_train_step([lead_dif], lead_seq)
+                if strategy is not None:
+                    trainer.distributed_train_step([lead_dif], lead_seq)
+                else:
+                    trainer.train_step([lead_dif], lead_seq)
+
                 mem_usage = tf.config.experimental.get_memory_info('GPU:0')
 
                 logger.info(
