@@ -14,8 +14,8 @@ from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.preprocessing.data_pipeline import load_dataset_from_records
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
-    PATH_TENSORBOARD
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
+    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -29,13 +29,14 @@ def get_strategy():
     config_file_path = get_src_root() + "/config/tensorflow.json"
 
     with open(config_file_path, "r") as f:
-        # os.environ["TF_CONFIG"] = f.read().replace("\n", "")
+        os.environ["TF_CONFIG"] = f.read().replace("\n", "")
         os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
     # Use NCCL for GPUs
     communication_options = tf.distribute.experimental.CommunicationOptions(
         implementation=tf.distribute.experimental.CommunicationImplementation.NCCL)
 
+    # Get multi worker strategy
     strategy = tf.distribute.MultiWorkerMirroredStrategy(
         communication_options=communication_options)
 
@@ -53,12 +54,15 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
                                   num_encoders=1,
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
+
         trainer = Trainer(transformer=transformer, optimizer=optimizer,
                           train_loss=train_loss, train_accuracy=train_accuracy,
                           val_loss=val_loss, val_accuracy=val_accuracy,
                           mask_types=[MaskType.lookahead], strategy=strategy)
 
         return transformer, trainer
+    elif network_type == NetworkType.acmp:
+        pass
     else:
         raise NotImplementedError
 
@@ -127,7 +131,7 @@ def train_network(network_type, start_epoch=0):
         checkpoint = tf.train.Checkpoint(transformer=transformer,
                                          optimizer=optimizer,
                                          epoch=start_epoch)
-        checkpoint_path = PATH_CHECKPOINT_LEAD + "/" + network_type.value
+        checkpoint_path = PATH_CHECKPOINT + "/" + network_type.value
         checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=10)
 
         # If checkpoint exists, restore it
@@ -140,7 +144,9 @@ def train_network(network_type, start_epoch=0):
         # Tensorboard setup
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
         train_log_dir = PATH_TENSORBOARD + "/" + current_time + '/train'
+        val_log_dir = PATH_TENSORBOARD + "/" + current_time + '/val'
         train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+        val_summary_writer = tf.summary.create_file_writer(val_log_dir)
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), EPOCHS):
@@ -151,6 +157,7 @@ def train_network(network_type, start_epoch=0):
             val_distributed_ds = val_ds \
                 .prefetch(tf.data.AUTOTUNE)
 
+            #
             if strategy is not None:
                 train_distributed_ds = strategy.experimental_distribute_dataset(train_distributed_ds)
                 val_distributed_ds = strategy.experimental_distribute_dataset(val_distributed_ds)
@@ -180,8 +187,6 @@ def train_network(network_type, start_epoch=0):
                 with train_summary_writer.as_default():
                     tf.summary.scalar("train_loss", train_loss.result(), step=optimizer.iterations)
                     tf.summary.scalar("train_accuracy", train_accuracy.result(), step=optimizer.iterations)
-                    tf.summary.scalar("val_loss", val_loss.result(), step=optimizer.iterations)
-                    tf.summary.scalar("val_accuracy", val_accuracy.result(), step=optimizer.iterations)
 
                 # Logging
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
@@ -192,6 +197,8 @@ def train_network(network_type, start_epoch=0):
                 # Reset timer
                 batch_timer = time.time()
                 tf.config.experimental.reset_memory_stats("GPU:0")
+
+            logger.info(f"[E{epoch + 1:02d}]: Calculation validation statistics...")
 
             # Validation batches
             for (batch_num, batch) in enumerate(val_distributed_ds):
@@ -204,8 +211,12 @@ def train_network(network_type, start_epoch=0):
                 else:
                     trainer.val_step([lead_dif], lead_seq)
 
+            # Tensorboard
+            with val_summary_writer.as_default():
+                tf.summary.scalar("val_loss", val_loss.result(), step=epoch)
+                tf.summary.scalar("val_accuracy", val_accuracy.result(), step=epoch)
+
             # Logging
-            logger.info(f"[Epoch ended]")
             logger.info(f"[E{epoch + 1:02d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
                         f"Val Loss {val_loss.result():.4f}, Val Accuracy {val_accuracy.result():.4f}. "
                         f"Time taken: {round(time.time() - epoch_timer, 2)}s")
