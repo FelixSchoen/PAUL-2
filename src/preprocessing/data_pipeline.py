@@ -69,7 +69,7 @@ def load_dataset_from_records(files=None):
     ds = raw_dataset.map(_parse_function) \
         .cache() \
         .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
-        .batch(BATCH_SIZE) \
+        .batch(BATCH_SIZE, drop_remainder=True) \
         .prefetch(tf.data.AUTOTUNE)
 
     return ds
