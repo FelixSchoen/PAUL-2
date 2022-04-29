@@ -6,6 +6,7 @@ import tensorflow as tf
 class MaskType(Enum):
     padding = "padding"
     lookahead = "lookahead"
+    singleout = "singleout"
 
 
 def create_padding_mask(seq):

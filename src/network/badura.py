@@ -76,7 +76,7 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
         trainer = Trainer(transformer=transformer, optimizer=optimizer,
                           train_loss=train_loss, train_accuracy=train_accuracy,
                           val_loss=val_loss, val_accuracy=val_accuracy,
-                          mask_types=[MaskType.padding, MaskType.padding], strategy=strategy)  # TODO Single view
+                          mask_types=[MaskType.padding, MaskType.singleout], strategy=strategy)  # TODO Single view
 
         return transformer, trainer
     else:

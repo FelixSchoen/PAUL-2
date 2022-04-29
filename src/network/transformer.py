@@ -1,7 +1,8 @@
 import tensorflow as tf
 
+from src.exception.exceptions import UnexpectedValueException
 from src.network.layers import EncoderLayer, DecoderLayer
-from src.network.masking import create_padding_mask, create_combined_mask, MaskType
+from src.network.masking import create_padding_mask, create_combined_mask, MaskType, create_single_out_mask
 from src.network.positional_encoding import positional_encoding
 from src.settings import SEQUENCE_MAX_LENGTH
 
@@ -131,11 +132,18 @@ class Transformer(tf.keras.Model):
         for inp, mask_type in zip(inputs, mask_types):
             if mask_type == MaskType.padding:
                 dec_masks.append(create_padding_mask(inp))
-            else:
+            elif mask_type == MaskType.lookahead:
                 # Create lookahead mask, remove last entry to fit shape of input
                 dec_mask = create_combined_mask(inp)
                 dec_mask = dec_mask[:, :, :-1, :]
                 dec_masks.append(dec_mask)
+            elif mask_type == MaskType.singleout:
+                # Create lookahead mask, remove last entry to fit shape of input
+                dec_mask = create_combined_mask(inp, mask_fn=create_single_out_mask)
+                dec_mask = dec_mask[:, :, :-1, :]
+                dec_masks.append(dec_mask)
+            else:
+                raise UnexpectedValueException("Unknown masking type")
 
         # Collect Encoder Outputs
         enc_outputs = []
