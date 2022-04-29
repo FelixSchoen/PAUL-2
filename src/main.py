@@ -30,6 +30,12 @@ def main():
             train_network(network_type=NetworkType.lead)
 
             logger.info("Successfully trained lead network.")
+        elif args.network == "acmp":
+            logger.info("Starting training process for acmp network...")
+
+            train_network(network_type=NetworkType.acmp)
+
+            logger.info("Successfully trained acmp network.")
     elif args.command == "generate":
         pass
 

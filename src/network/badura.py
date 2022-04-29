@@ -15,7 +15,7 @@ from src.network.transformer import Transformer
 from src.preprocessing.data_pipeline import load_dataset_from_records
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
-    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE
+    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -43,7 +43,8 @@ def get_strategy():
     return strategy
 
 
-def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_accuracy, val_loss, val_accuracy):
+def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_accuracy, val_loss, val_accuracy,
+                        INPUT_VOCA_SIZE_MDL=None):
     if network_type == NetworkType.lead:
         transformer = Transformer(num_layers=NUM_LAYERS,
                                   d_model=D_MODEL,
@@ -62,7 +63,22 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
 
         return transformer, trainer
     elif network_type == NetworkType.acmp:
-        pass
+        transformer = Transformer(num_layers=NUM_LAYERS,
+                                  d_model=D_MODEL,
+                                  num_heads=NUM_HEADS,
+                                  dff=DFF,
+                                  input_vocab_sizes=[INPUT_VOCAB_SIZE_MLD, INPUT_VOCAB_SIZE_DIF],
+                                  target_vocab_size=ACMP_OUTPUT_VOCAB_SIZE,
+                                  num_encoders=2,
+                                  attention_type=AttentionType.relative,
+                                  max_relative_distance=SEQUENCE_MAX_LENGTH)
+
+        trainer = Trainer(transformer=transformer, optimizer=optimizer,
+                          train_loss=train_loss, train_accuracy=train_accuracy,
+                          val_loss=val_loss, val_accuracy=val_accuracy,
+                          mask_types=[MaskType.padding, MaskType.lookahead], strategy=strategy)
+
+        return transformer, trainer
     else:
         raise NotImplementedError
 
@@ -175,13 +191,13 @@ def train_network(network_type, start_epoch=0):
             # Train batches
             for (batch_num, batch) in enumerate(train_distributed_ds):
                 # Load data
-                lead_seq, lead_dif, acmp_seq, acmp_dif = _load_data(batch)
+                inputs, target = _load_data(network_type, batch)
 
                 # Train step
                 if strategy is not None:
-                    trainer.distributed_train_step([lead_dif], lead_seq)
+                    trainer.distributed_train_step(inputs, target)
                 else:
-                    trainer.train_step([lead_dif], lead_seq)
+                    trainer.train_step(inputs, target)
 
                 # Tensorboard
                 with train_summary_writer.as_default():
@@ -203,13 +219,13 @@ def train_network(network_type, start_epoch=0):
             # Validation batches
             for (batch_num, batch) in enumerate(val_distributed_ds):
                 # Load data
-                lead_seq, lead_dif, acmp_seq, acmp_dif = _load_data(batch)
+                inputs, target = _load_data(network_type, batch)
 
                 # Validation step
                 if strategy is not None:
-                    trainer.distributed_val_step([lead_dif], lead_seq)
+                    trainer.distributed_val_step(inputs, target)
                 else:
-                    trainer.val_step([lead_dif], lead_seq)
+                    trainer.val_step(inputs, target)
 
             # Tensorboard
             with val_summary_writer.as_default():
@@ -226,7 +242,7 @@ def train_network(network_type, start_epoch=0):
             print(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
 
 
-def _load_data(batch):
+def _load_data(network_type, batch):
     lead_seqs, lead_difs, acmp_seqs, acmp_difs = [], [], [], []
 
     if hasattr(batch, "values"):
@@ -245,4 +261,16 @@ def _load_data(batch):
     acmp_seq = tf.stack(acmp_seqs)
     acmp_dif = tf.stack(acmp_difs)
 
-    return lead_seq, lead_dif, acmp_seq, acmp_dif
+    inputs = []
+    target = None
+
+    if network_type == NetworkType.lead:
+        inputs = [lead_dif]
+        target = lead_seq
+    elif network_type == NetworkType.acmp:
+        inputs = [lead_seq, acmp_dif]
+        target = acmp_seq
+    else:
+        raise NotImplementedError
+
+    return inputs, target
