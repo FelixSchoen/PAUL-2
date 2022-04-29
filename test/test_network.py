@@ -233,21 +233,24 @@ def test_relative_multi_head_attention():
 def test_combined():
     tokenizers, train_batches, val_batches, max_tokens = _get_demo_dataset()
 
-    train_loss = tf.keras.metrics.Mean(name='train_loss')
-    train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
+    train_loss = tf.keras.metrics.Mean(name="train_loss")
+    train_accuracy = tf.keras.metrics.Mean(name="train_accuracy")
+    val_loss = tf.keras.metrics.Mean(name="val_loss")
+    val_accuracy = tf.keras.metrics.Mean(name="val_accuracy")
 
     learning_rate = TransformerLearningRateSchedule(D_MODEL)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                          epsilon=1e-9)
 
-    transformer = Transformer(num_layers=NUM_LAYERS,
-                              d_model=D_MODEL,
-                              num_heads=NUM_HEADS,
-                              dff=DFF,
-                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
+    transformer = Transformer(num_layers=4,
+                              d_model=128,
+                              num_heads=8,
+                              dff=512,
+                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy(),
+                                                 tokenizers.pt.get_vocab_size().numpy()],
                               target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
-                              num_encoders=1,
+                              num_encoders=2,
                               attention_type=AttentionType.absolute,
                               max_relative_distance=max_tokens)
 
@@ -259,17 +262,15 @@ def test_combined():
         train_loss.reset_states()
         train_accuracy.reset_states()
 
-        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, [MaskType.padding])
+        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy,
+                          [MaskType.padding, MaskType.padding], strategy=None)
 
         # inp -> portuguese, tar -> english
         for (batch, (inp, tar)) in enumerate(train_batches):
-            trainer.train_step([inp], tar)
+            trainer.train_step([inp, inp], tar)
 
             print(
                 f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
-
-            if batch == 2:
-                break
 
         print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 

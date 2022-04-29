@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from src.network.optimization import accuracy_function, loss_function
-from src.settings import D_TYPE_SEQUENCE
+from src.settings import D_TYPE
 
 
 class Trainer:
@@ -20,8 +20,8 @@ class Trainer:
         Trainer.mask_types = mask_types
 
         Trainer.signature = [
-            tf.TensorSpec(shape=(None,), dtype=D_TYPE_SEQUENCE),
-            tf.TensorSpec(shape=(None,), dtype=D_TYPE_SEQUENCE),
+            tf.TensorSpec(shape=(None,), dtype=D_TYPE),
+            tf.TensorSpec(shape=(None,), dtype=D_TYPE),
         ]
 
     @staticmethod

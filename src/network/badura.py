@@ -76,7 +76,7 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
         trainer = Trainer(transformer=transformer, optimizer=optimizer,
                           train_loss=train_loss, train_accuracy=train_accuracy,
                           val_loss=val_loss, val_accuracy=val_accuracy,
-                          mask_types=[MaskType.padding, MaskType.lookahead], strategy=strategy)
+                          mask_types=[MaskType.padding, MaskType.padding], strategy=strategy)  # TODO Single view
 
         return transformer, trainer
     else:
@@ -260,9 +260,6 @@ def _load_data(network_type, batch):
     lead_dif = tf.stack(lead_difs)
     acmp_seq = tf.stack(acmp_seqs)
     acmp_dif = tf.stack(acmp_difs)
-
-    inputs = []
-    target = None
 
     if network_type == NetworkType.lead:
         inputs = [lead_dif]

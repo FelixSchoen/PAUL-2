@@ -11,9 +11,9 @@ from sCoda import Composition, Bar
 from src.exception.exceptions import UnexpectedValueException
 from src.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
     BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE_SEQUENCE
+    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE
 from src.util.logging import get_logger
-from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
+from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load, get_project_root
 
 
 def load_and_store_records(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH):
@@ -24,7 +24,7 @@ def load_and_store_records(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH
 
     pool = Pool()
     options = tf.io.TFRecordOptions(compression_type="GZIP")
-    with tf.io.TFRecordWriter("D:/Documents/Coding/Repository/Badura/out/dataset/data.tfrecords",
+    with tf.io.TFRecordWriter(get_project_root() + "/out/dataset/data.tfrecords",
                               options=options) as writer:
         for example in pool.map(_serialize_example, list(data_rows)):
             writer.write(example)
@@ -60,10 +60,10 @@ def load_dataset_from_records(files=None):
     def _parse_function(example_proto):
         dictionary = tf.io.parse_single_example(example_proto, feature_desc)
         return tf.stack(
-            [tf.cast(dictionary["lead_msg"], dtype=D_TYPE_SEQUENCE),
-             tf.cast(dictionary["lead_dif"], dtype=D_TYPE_SEQUENCE),
-             tf.cast(dictionary["acmp_msg"], dtype=D_TYPE_SEQUENCE),
-             tf.cast(dictionary["acmp_dif"], dtype=D_TYPE_SEQUENCE),
+            [tf.cast(dictionary["lead_msg"], dtype=D_TYPE),
+             tf.cast(dictionary["lead_dif"], dtype=D_TYPE),
+             tf.cast(dictionary["acmp_msg"], dtype=D_TYPE),
+             tf.cast(dictionary["acmp_dif"], dtype=D_TYPE),
              ])
 
     ds = raw_dataset.map(_parse_function) \
@@ -77,7 +77,7 @@ def load_dataset_from_records(files=None):
 
 def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
     ds = tf.data.Dataset.from_generator(_bar_generator, output_signature=(
-        tf.TensorSpec(shape=(4, 512), dtype=D_TYPE_SEQUENCE)
+        tf.TensorSpec(shape=(4, 512), dtype=D_TYPE)
     ), args=[directory]) \
         .shuffle(buffer_size, seed=SHUFFLE_SEED) \
         .batch(BATCH_SIZE) \
@@ -231,13 +231,13 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
     lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
 
     for i, (seq, dif) in enumerate([(lead_seq, lead_dif), (acmp_seq, acmp_dif)]):
+        tokenizer = Tokenizer(skip_time_signature=(i == 1))
+
         for bar in bars[i]:
             data_frame = bar.to_relative_dataframe()
 
             # Sanity check
             assert len(data_frame) > 0
-
-            tokenizer = Tokenizer()
 
             # Pandas dataframe to list of tokens
             for _, row in data_frame.iterrows():
@@ -250,6 +250,7 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
 
             # Append trailing wait messages
             tokens = tokenizer.flush_wait_buffer()
+
             seq.extend(tokens)
             dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
 
@@ -259,8 +260,8 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
         seq.append(STOP_TOKEN)
         dif.append(STOP_TOKEN)
 
-    return tf.convert_to_tensor(lead_seq, dtype=D_TYPE_SEQUENCE), tf.convert_to_tensor(lead_dif, dtype=D_TYPE_SEQUENCE), \
-           tf.convert_to_tensor(acmp_seq, dtype=D_TYPE_SEQUENCE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE_SEQUENCE)
+    return tf.convert_to_tensor(lead_seq, dtype=D_TYPE), tf.convert_to_tensor(lead_dif, dtype=D_TYPE), \
+           tf.convert_to_tensor(acmp_seq, dtype=D_TYPE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE)
 
 
 def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]:
@@ -493,9 +494,11 @@ class Tokenizer:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, skip_time_signature=False) -> None:
         super().__init__()
         self.wait_buffer = 0
+        self.flags = dict()
+        self.flags["skip_time_signature"] = skip_time_signature
 
     def tokenize(self, entry):
         msg_type = entry["message_type"]
@@ -511,6 +514,9 @@ class Tokenizer:
             shifter = 3 + 24 + 88
             value = int(entry["note"]) - 21
         elif msg_type == "time_signature":
+            if "skip_time_signature" in self.flags:
+                return []
+
             shifter = 3 + 24 + 88 + 88
             signature = (int(entry["numerator"]), int(entry["denominator"]))
             value = VALID_TIME_SIGNATURES.index(signature)
