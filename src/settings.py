@@ -43,6 +43,9 @@ TRAIN_VAL_SPLIT = 0.85
 BATCH_SIZE = 64
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
+
+EPOCHS = 32
+
 # How often the encoder / decoder should be stacked
 NUM_LAYERS = 6  # 4
 # Number of attention heads

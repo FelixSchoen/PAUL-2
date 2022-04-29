@@ -1,3 +1,4 @@
+import os
 import time
 from contextlib import nullcontext
 from enum import Enum
@@ -12,7 +13,7 @@ from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.preprocessing.data_pipeline import load_dataset_from_records
 from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT_LEAD, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -25,8 +26,8 @@ class NetworkType(Enum):
 def get_strategy():
     config_file_path = get_src_root() + "/config/tensorflow.json"
 
-    # with open(config_file_path, "r") as f:
-    #     os.environ["TF_CONFIG"] = f.read().replace("\n", "")
+    with open(config_file_path, "r") as f:
+        os.environ["TF_CONFIG"] = f.read().replace("\n", "")
 
     # Use NCCL for GPUs
     communication_options = tf.distribute.experimental.CommunicationOptions(
@@ -35,8 +36,8 @@ def get_strategy():
     strategy = tf.distribute.MultiWorkerMirroredStrategy(
         communication_options=communication_options)
 
-    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"],
-                                              cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
+    # strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"],
+    #                                           cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
 
     return strategy
 
@@ -105,6 +106,9 @@ def train_network(network_type, start_epoch=0):
         train_loss = tf.keras.metrics.Mean(name="train_loss")
         train_accuracy = tf.keras.metrics.Mean(name="train_accuracy")
 
+        # val_loss = tf.keras.metrics.Mean(name="val_loss")
+        # val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="val_accuracy")
+
         transformer, trainer = get_transformer(network_type, strategy=strategy, optimizer=optimizer,
                                                train_loss=train_loss, train_accuracy=train_accuracy)
 
@@ -128,13 +132,8 @@ def train_network(network_type, start_epoch=0):
                 f"Restored checkpoint, will start from epoch {start_epoch.numpy()}, {optimizer.iterations.numpy()} "
                 f"iterations already completed.")
 
-        # val_loss = tf.keras.metrics.Mean(name="val_loss")
-        # val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="val_accuracy")
-
-        epochs = 1
-
         logger.info("Starting training process...")
-        for epoch in range(start_epoch.numpy(), epochs):
+        for epoch in range(start_epoch.numpy(), EPOCHS):
             # Shuffle dataset
             distributed_ds = train_ds \
                 .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch) \
