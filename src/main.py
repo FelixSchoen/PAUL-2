@@ -1,14 +1,18 @@
 import argparse
 
-from src.network.badura import train_network, NetworkType
-from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
 from src.config.settings import DATA_MIDI_INPUT_PATH
+from src.network.badura import train_network, NetworkType, generate
+from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
 from src.util.logging import get_logger
 
 
 def main():
-    args = parse_arguments()
+    args, parser = parse_arguments()
     logger = get_logger(__name__)
+
+    if not hasattr(args, "command"):
+        parser.print_help()
+        return
 
     if args.command == "preprocess":
         logger.info("Preprocessing MIDI files...")
@@ -37,6 +41,10 @@ def main():
 
             logger.info("Successfully trained acmp network.")
     elif args.command == "generate":
+        if args.track == "lead":
+            logger.info(f"Generating lead track with difficulty {args.difficulty}...")
+
+            generate(network_type=NetworkType.lead, model_identifier=args.model_identifier)
         pass
 
 
@@ -48,7 +56,7 @@ def parse_arguments():
     # Preprocess Command
     parser_train = subparsers.add_parser("preprocess", aliases=["p"], help="Preprocesses data.")
     parser_train.set_defaults(command="preprocess")
-    parser_train.add_argument("--skip-midi", action="store_true",
+    parser_train.add_argument("--skip_midi", action="store_true",
                               help="Skips processing and storing of MIDI files.")
 
     # Train Command
@@ -61,9 +69,15 @@ def parse_arguments():
     parser_generate = subparsers.add_parser("generate", aliases=["g"],
                                             help="Generates new music based on the given parameters.")
     parser_generate.set_defaults(command="generate")
+    parser_generate.add_argument("track", choices=["lead", "acmp", "combined"],
+                                 help="Selects which track to generate.")
+    parser_generate.add_argument("--difficulty", "-d", type=int, choices=range(1, 11), required=True,
+                                 help="Determines the difficulty of the tracks to generate.")
+    parser_generate.add_argument("--model_identifier", "-i", required=True,
+                                 help="Determines which model to load.")
 
     args = parser.parse_args()
-    return args
+    return args, parser
 
 
 if __name__ == '__main__':

@@ -1,14 +1,14 @@
 import tensorflow as tf
 
-from src.network.optimization import accuracy_function, loss_function
 from src.config.settings import D_TYPE
+from src.network.optimization import accuracy_function, loss_function
 
 
 class Trainer:
-    strategy, transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy, mask_types, signature = \
-        None, None, None, None, None, None, None, None, None
+    strategy, transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy, signature = \
+        None, None, None, None, None, None, None, None
 
-    def __init__(self, transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy, mask_types, *,
+    def __init__(self, transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy, *,
                  strategy):
         Trainer.strategy = strategy
         Trainer.transformer = transformer
@@ -17,7 +17,6 @@ class Trainer:
         Trainer.train_accuracy = train_accuracy
         Trainer.val_loss = val_loss
         Trainer.val_accuracy = val_accuracy
-        Trainer.mask_types = mask_types
 
         Trainer.signature = [
             tf.TensorSpec(shape=(None,), dtype=D_TYPE),
@@ -32,8 +31,7 @@ class Trainer:
 
         with tf.GradientTape() as tape:
             predictions, _ = Trainer.transformer([inputs, tar_inp],
-                                                 training=True,
-                                                 mask_types=Trainer.mask_types)
+                                                 training=True)
             loss = loss_function(tar_real, predictions)
 
         gradients = tape.gradient(loss, Trainer.transformer.trainable_variables)
@@ -51,8 +49,7 @@ class Trainer:
         tar_real = target[:, 1:]
 
         predictions, _ = Trainer.transformer([inputs, tar_inp],
-                                             training=True,
-                                             mask_types=Trainer.mask_types)
+                                             training=True)
         loss = loss_function(tar_real, predictions)
 
         Trainer.val_loss(loss)

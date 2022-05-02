@@ -43,8 +43,8 @@ def get_strategy():
     return strategy
 
 
-def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_accuracy, val_loss, val_accuracy,
-                        INPUT_VOCA_SIZE_MDL=None):
+def get_network_objects(network_type, *, strategy=None, optimizer=None, train_loss=None, train_accuracy=None,
+                        val_loss=None, val_accuracy=None):
     if network_type == NetworkType.lead:
         transformer = Transformer(num_layers=NUM_LAYERS,
                                   d_model=D_MODEL,
@@ -53,13 +53,13 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
                                   input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
                                   target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
                                   num_encoders=1,
+                                  mask_types=[MaskType.lookahead],
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
 
         trainer = Trainer(transformer=transformer, optimizer=optimizer,
                           train_loss=train_loss, train_accuracy=train_accuracy,
-                          val_loss=val_loss, val_accuracy=val_accuracy,
-                          mask_types=[MaskType.lookahead], strategy=strategy)
+                          val_loss=val_loss, val_accuracy=val_accuracy, strategy=strategy)
 
         return transformer, trainer
     elif network_type == NetworkType.acmp:
@@ -70,13 +70,13 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
                                   input_vocab_sizes=[INPUT_VOCAB_SIZE_MLD, INPUT_VOCAB_SIZE_DIF],
                                   target_vocab_size=ACMP_OUTPUT_VOCAB_SIZE,
                                   num_encoders=2,
+                                  mask_types=[MaskType.padding, MaskType.singleout],
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
 
         trainer = Trainer(transformer=transformer, optimizer=optimizer,
                           train_loss=train_loss, train_accuracy=train_accuracy,
-                          val_loss=val_loss, val_accuracy=val_accuracy,
-                          mask_types=[MaskType.padding, MaskType.singleout], strategy=strategy)
+                          val_loss=val_loss, val_accuracy=val_accuracy, strategy=strategy)
 
         return transformer, trainer
     else:
@@ -154,7 +154,7 @@ def train_network(network_type, start_epoch=0):
         if checkpoint_manager.latest_checkpoint:
             checkpoint.restore(checkpoint_manager.latest_checkpoint)
             logger.info(
-                f"Restored checkpoint, will start from epoch {start_epoch.numpy()}, {optimizer.iterations.numpy()} "
+                f"Restored checkpoint, will start from epoch {start_epoch.numpy() + 1}, {optimizer.iterations.numpy()} "
                 f"iterations already completed.")
 
         # Tensorboard setup
@@ -239,11 +239,22 @@ def train_network(network_type, start_epoch=0):
 
             # Save checkpoint
             checkpoint_save_path = checkpoint_manager.save()
-            print(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
+            logger.info(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
 
         # Save model
         logger.info("Finished training process. Saving model.")
         transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
+        transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
+
+
+def generate(network_type, model_identifier):
+    logger = get_logger(__name__)
+
+    # Load model
+    logger.info("Constructing model...")
+    transformer, _ = get_network_objects(network_type)
+    transformer.build_model()
+    transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
 
 
 def _load_data(network_type, batch):

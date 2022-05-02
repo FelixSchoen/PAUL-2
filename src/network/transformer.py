@@ -1,10 +1,10 @@
 import tensorflow as tf
 
+from src.config.settings import SEQUENCE_MAX_LENGTH, D_TYPE
 from src.exception.exceptions import UnexpectedValueException
 from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_combined_mask, MaskType, create_single_out_mask
 from src.network.positional_encoding import positional_encoding
-from src.config.settings import SEQUENCE_MAX_LENGTH
 
 
 class Encoder(tf.keras.layers.Layer):
@@ -95,10 +95,11 @@ class Decoder(tf.keras.layers.Layer):
 
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_sizes, target_vocab_size, num_encoders,
-                 attention_type, max_relative_distance, rate=0.1):
+                 mask_types, attention_type, max_relative_distance, rate=0.1):
         super().__init__()
 
         self.num_encoders = num_encoders
+        self.mask_types = mask_types
 
         assert num_encoders == len(input_vocab_sizes)
 
@@ -115,9 +116,7 @@ class Transformer(tf.keras.Model):
 
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
-    def call(self, omni_input, training, mask_types):
-        assert len(mask_types) == self.num_encoders
-
+    def call(self, omni_input, training):
         # Pass all inputs in first argument
         inputs, target = omni_input
 
@@ -129,7 +128,7 @@ class Transformer(tf.keras.Model):
         # Create masks for decoder
         dec_self_attention_mask = create_combined_mask(target)
         dec_masks = []
-        for inp, mask_type in zip(inputs, mask_types):
+        for inp, mask_type in zip(inputs, self.mask_types):
             if mask_type == MaskType.padding:
                 dec_masks.append(create_padding_mask(inp))
             elif mask_type == MaskType.lookahead:
@@ -158,3 +157,13 @@ class Transformer(tf.keras.Model):
         final_output = self.final_layer(dec_output)
 
         return final_output, attention_weights
+
+    def build_model(self):
+        def _get_uniform():
+            return tf.cast(tf.random.uniform((1, SEQUENCE_MAX_LENGTH), minval=0, maxval=9, dtype=tf.int32),
+                           dtype=D_TYPE)
+
+        inputs = [_get_uniform() for _ in range(self.num_encoders)]
+        target = _get_uniform()[:, :-1]
+
+        _, _ = self([inputs, target], False)
