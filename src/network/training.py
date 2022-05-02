@@ -24,7 +24,7 @@ class Trainer:
         ]
 
     @staticmethod
-    # @tf.function  # (input_signature=signature)
+    @tf.function  # (input_signature=signature)
     def train_step(inputs, target):
         tar_inp = target[:, :-1]
         tar_real = target[:, 1:]
@@ -43,7 +43,7 @@ class Trainer:
         return loss
 
     @staticmethod
-    #@tf.function
+    @tf.function
     def val_step(inputs, target):
         tar_inp = target[:, :-1]
         tar_real = target[:, 1:]
@@ -58,7 +58,7 @@ class Trainer:
         return loss
 
     @staticmethod
-    #@tf.function
+    @tf.function
     def distributed_train_step(inputs, target):
         per_replica_losses = Trainer.strategy.run(Trainer.train_step,
                                                   args=(inputs, target))
@@ -69,7 +69,7 @@ class Trainer:
         return overall_loss
 
     @staticmethod
-    #@tf.function
+    @tf.function
     def distributed_val_step(inputs, target):
         per_replica_losses = Trainer.strategy.run(Trainer.val_step,
                                                   args=(inputs, target))
