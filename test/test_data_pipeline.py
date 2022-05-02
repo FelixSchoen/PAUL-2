@@ -1,5 +1,5 @@
 from src.preprocessing.data_pipeline import Tokenizer, Detokenizer
-from src.settings import VALID_TIME_SIGNATURES
+from src.config.settings import VALID_TIME_SIGNATURES
 
 
 def test_tokenization():

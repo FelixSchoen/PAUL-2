@@ -7,15 +7,15 @@ from enum import Enum
 import tensorflow as tf
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
+from src.config.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
+    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL
 from src.network.attention import AttentionType
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.preprocessing.data_pipeline import load_dataset_from_records
-from src.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
-    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -76,7 +76,7 @@ def get_network_objects(network_type, *, strategy, optimizer, train_loss, train_
         trainer = Trainer(transformer=transformer, optimizer=optimizer,
                           train_loss=train_loss, train_accuracy=train_accuracy,
                           val_loss=val_loss, val_accuracy=val_accuracy,
-                          mask_types=[MaskType.padding, MaskType.singleout], strategy=strategy)  # TODO Single view
+                          mask_types=[MaskType.padding, MaskType.singleout], strategy=strategy)
 
         return transformer, trainer
     else:
@@ -173,7 +173,7 @@ def train_network(network_type, start_epoch=0):
             val_distributed_ds = val_ds \
                 .prefetch(tf.data.AUTOTUNE)
 
-            #
+            # Distribute datasets
             if strategy is not None:
                 train_distributed_ds = strategy.experimental_distribute_dataset(train_distributed_ds)
                 val_distributed_ds = strategy.experimental_distribute_dataset(val_distributed_ds)
@@ -240,6 +240,10 @@ def train_network(network_type, start_epoch=0):
             # Save checkpoint
             checkpoint_save_path = checkpoint_manager.save()
             print(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
+
+        # Save model
+        logger.info("Finished training process. Saving model.")
+        transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
 
 
 def _load_data(network_type, batch):

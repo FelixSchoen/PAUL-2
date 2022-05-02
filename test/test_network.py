@@ -15,7 +15,7 @@ from src.network.optimization import TransformerLearningRateSchedule
 from src.network.positional_encoding import positional_encoding
 from src.network.training import Trainer
 from src.network.transformer import Encoder, Decoder, Transformer
-from src.settings import D_MODEL
+from src.config.settings import D_MODEL
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)

@@ -4,7 +4,7 @@ from src.exception.exceptions import UnexpectedValueException
 from src.network.layers import EncoderLayer, DecoderLayer
 from src.network.masking import create_padding_mask, create_combined_mask, MaskType, create_single_out_mask
 from src.network.positional_encoding import positional_encoding
-from src.settings import SEQUENCE_MAX_LENGTH
+from src.config.settings import SEQUENCE_MAX_LENGTH
 
 
 class Encoder(tf.keras.layers.Layer):

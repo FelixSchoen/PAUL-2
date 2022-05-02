@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from src.network.optimization import accuracy_function, loss_function
-from src.settings import D_TYPE
+from src.config.settings import D_TYPE
 
 
 class Trainer:

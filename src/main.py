@@ -2,7 +2,7 @@ import argparse
 
 from src.network.badura import train_network, NetworkType
 from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
-from src.settings import DATA_MIDI_INPUT_PATH
+from src.config.settings import DATA_MIDI_INPUT_PATH
 from src.util.logging import get_logger
 
 

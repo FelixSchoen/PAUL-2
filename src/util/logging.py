@@ -1,7 +1,7 @@
 import logging
 import logging.config
 
-from src.settings import ROOT_LOGGER
+from src.config.settings import ROOT_LOGGER
 from src.util.util import get_src_root
 
 initial_call = True
