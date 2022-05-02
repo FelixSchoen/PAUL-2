@@ -1,4 +1,5 @@
 import copy
+import math
 import os.path
 import re
 from multiprocessing import Pool
@@ -8,10 +9,11 @@ import numpy as np
 import tensorflow as tf
 from sCoda import Composition, Bar
 
+from src.config.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, \
+    CONSECUTIVE_BAR_MAX_LENGTH, \
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
+    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE
 from src.exception.exceptions import UnexpectedValueException
-from src.config.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load, get_project_root
 
@@ -244,7 +246,6 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
                 try:
                     tokens = tokenizer.tokenize(row)
                     seq.extend(tokens)
-                    dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
                 except UnexpectedValueException:
                     pass
 
@@ -252,7 +253,7 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
             tokens = tokenizer.flush_wait_buffer()
 
             seq.extend(tokens)
-            dif.extend([int(bar.difficulty * DIFFICULTY_VALUE_SCALE + 1) for _ in range(0, len(tokens))])
+            dif.extend([tokenizer.tokenize_difficulty(bar.difficulty) for _ in range(0, len(seq))])
 
         # Add start and stop messages
         seq.insert(0, START_TOKEN)
@@ -483,7 +484,6 @@ class Tokenizer:
     """ Tokenizer for sequences.
 
     Ranges:
-    [-1       ] ... start
     [0        ] ... padding
     [1        ] ... start
     [2        ] ... stop
@@ -527,6 +527,12 @@ class Tokenizer:
         tokens.append(shifter + value)
 
         return tokens
+
+    def tokenize_difficulty(self, difficulty):
+        shifter = 3
+        scaled_difficulty = math.floor(min(DIFFICULTY_VALUE_SCALE - 1, difficulty * DIFFICULTY_VALUE_SCALE))
+
+        return shifter + scaled_difficulty
 
     def flush_wait_buffer(self):
         tokens = Tokenizer._flush_wait_buffer(self.wait_buffer)

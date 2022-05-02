@@ -1,5 +1,5 @@
+from src.config.settings import VALID_TIME_SIGNATURES, DIFFICULTY_VALUE_SCALE
 from src.preprocessing.data_pipeline import Tokenizer, Detokenizer
-from src.config.settings import VALID_TIME_SIGNATURES
 
 
 def test_tokenization():
@@ -56,3 +56,15 @@ def test_detokenization():
 
     # Assert length
     assert len(generated_messages) == 215
+
+
+def test_tokenization_difficulty():
+    tokenizer = Tokenizer()
+
+    difficulties = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+
+    for difficulty in difficulties:
+        tokenized = tokenizer.tokenize_difficulty(difficulty)
+        assert 0 <= tokenized - 3 <= DIFFICULTY_VALUE_SCALE - 1
+
+        print(f"{tokenized} ({tokenized - 2})")

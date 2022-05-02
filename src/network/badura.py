@@ -9,13 +9,14 @@ from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
-    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL
+    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, D_TYPE
 from src.network.attention import AttentionType
+from src.network.generator import Generator
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
-from src.preprocessing.data_pipeline import load_dataset_from_records
+from src.preprocessing.data_pipeline import load_dataset_from_records, Tokenizer
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -214,6 +215,8 @@ def train_network(network_type, start_epoch=0):
                 batch_timer = time.time()
                 tf.config.experimental.reset_memory_stats("GPU:0")
 
+                break
+
             logger.info(f"[E{epoch + 1:02d}]: Calculation validation statistics...")
 
             # Validation batches
@@ -226,6 +229,8 @@ def train_network(network_type, start_epoch=0):
                     trainer.distributed_val_step(inputs, target)
                 else:
                     trainer.val_step(inputs, target)
+
+                break
 
             # Tensorboard
             with val_summary_writer.as_default():
@@ -247,7 +252,7 @@ def train_network(network_type, start_epoch=0):
         transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
 
 
-def generate(network_type, model_identifier):
+def generate(network_type, model_identifier, difficulty):
     logger = get_logger(__name__)
 
     # Load model
@@ -255,6 +260,18 @@ def generate(network_type, model_identifier):
     transformer, _ = get_network_objects(network_type)
     transformer.build_model()
     transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
+
+    generator = Generator(transformer)
+
+    # Build difficulty tensor
+    tokenizer = Tokenizer()
+    dif_seq = [tokenizer.tokenize_difficulty((difficulty - 1) / 10) for _ in range(SEQUENCE_MAX_LENGTH - 2)]
+    dif_seq.insert(0, 1)
+    dif_seq.append(2)
+    dif_tensor = tf.convert_to_tensor(dif_seq, dtype=D_TYPE)
+    dif_tensor = tf.expand_dims(dif_tensor, 0)
+
+    generator([dif_tensor])
 
 
 def _load_data(network_type, batch):

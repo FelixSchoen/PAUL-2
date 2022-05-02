@@ -134,12 +134,12 @@ class Transformer(tf.keras.Model):
             elif mask_type == MaskType.lookahead:
                 # Create lookahead mask, remove last entry to fit shape of input
                 dec_mask = create_combined_mask(inp)
-                dec_mask = dec_mask[:, :, :-1, :]
+                dec_mask = dec_mask[:, :, 1:, :]
                 dec_masks.append(dec_mask)
             elif mask_type == MaskType.singleout:
-                # Create lookahead mask, remove last entry to fit shape of input
+                # Create singleout mask, remove last entry to fit shape of input
                 dec_mask = create_combined_mask(inp, mask_fn=create_single_out_mask)
-                dec_mask = dec_mask[:, :, :-1, :]
+                dec_mask = dec_mask[:, :, 1:, :]
                 dec_masks.append(dec_mask)
             else:
                 raise UnexpectedValueException("Unknown masking type")

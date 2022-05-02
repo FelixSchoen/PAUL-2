@@ -21,7 +21,7 @@ def test_different_dimensions():
     logging.info(f"Shape x: {tf.shape(x)}")
     logging.info(f"Shape y: {tf.shape(y)}")
 
-    z = y+x
+    z = y + x
 
     logging.info(f"Shape z: {tf.shape(z)}")
     logging.info(f"z: {z}")
