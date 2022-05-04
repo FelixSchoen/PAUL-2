@@ -8,8 +8,9 @@ import tensorflow as tf
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
-    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, TRAIN_VAL_SPLIT, SEQUENCE_MAX_LENGTH, EPOCHS, \
-    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, D_TYPE
+    INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
+    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, D_TYPE, \
+    DATA_TRAIN_OUTPUT_FILE_PATH, DATA_VAL_OUTPUT_FILE_PATH, BATCH_SIZE
 from src.network.attention import AttentionType
 from src.network.generator import Generator
 from src.network.masking import MaskType
@@ -101,27 +102,23 @@ def train_network(network_type, start_epoch=0):
         logger.info(f"Running with {logical_gpus} virtual GPUs...")
 
         logger.info("Loading dataset...")
-        ds = load_dataset_from_records()
+        train_ds = load_dataset_from_records(files=[DATA_TRAIN_OUTPUT_FILE_PATH])
+        val_ds = load_dataset_from_records(files=[DATA_VAL_OUTPUT_FILE_PATH])
 
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
-        ds = ds.with_options(options)
-
-        amount_batches = len(list(ds.as_numpy_iterator()))
-        logger.info(f"Overall dataset consists of {amount_batches} batches.")
-
-        # Split into training and validation data
-        logger.info("Splitting into training and validation datasets...")
-        train_size = int(TRAIN_VAL_SPLIT * amount_batches)
-        train_ds = ds.take(train_size)
-        val_ds = ds.skip(train_size)
+        train_ds = train_ds.with_options(options)
+        val_ds = val_ds.with_options(options)
 
         # Count batches
-        amount_train_batches = len(list(train_ds.as_numpy_iterator()))
+        amount_train_batches = len(list(train_ds.batch(BATCH_SIZE).as_numpy_iterator()))
         logger.info(f"Train dataset consists of {amount_train_batches} batches.")
 
-        amount_val_batches = len(list(val_ds.as_numpy_iterator()))
+        amount_val_batches = len(list(val_ds.batch(BATCH_SIZE).as_numpy_iterator()))
         logger.info(f"Validation dataset consists of {amount_val_batches} batches.")
+
+        amount_batches = amount_train_batches + amount_val_batches
+        logger.info(f"Overall dataset consists of {amount_batches} batches.")
 
         logger.info("Constructing model...")
 
@@ -167,11 +164,16 @@ def train_network(network_type, start_epoch=0):
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), EPOCHS):
-            # Shuffle dataset
+            # Prepare datasets
             train_distributed_ds = train_ds \
+                .cache() \
                 .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch) \
+                .batch(BATCH_SIZE) \
                 .prefetch(tf.data.AUTOTUNE)
             val_distributed_ds = val_ds \
+                .cache() \
+                .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch) \
+                .batch(BATCH_SIZE) \
                 .prefetch(tf.data.AUTOTUNE)
 
             # Distribute datasets
@@ -215,8 +217,6 @@ def train_network(network_type, start_epoch=0):
                 batch_timer = time.time()
                 tf.config.experimental.reset_memory_stats("GPU:0")
 
-                break
-
             logger.info(f"[E{epoch + 1:02d}]: Calculation validation statistics...")
 
             # Validation batches
@@ -229,8 +229,6 @@ def train_network(network_type, start_epoch=0):
                     trainer.distributed_val_step(inputs, target)
                 else:
                     trainer.val_step(inputs, target)
-
-                break
 
             # Tensorboard
             with val_summary_writer.as_default():

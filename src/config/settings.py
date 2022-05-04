@@ -9,10 +9,14 @@ ROOT_PATH = get_project_root()
 
 # Where to load raw MIDI files from
 DATA_MIDI_INPUT_PATH = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data"
-# Where to store processed compositions for quicker loading
-DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/pickle/compositions"
-DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH = DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH + "/{0}.zip"
-DATA_SET_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data.tfrecords"
+
+# Where to store processed bars for quicker loading
+DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/bars/train"
+DATA_BARS_VAL_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/bars/val"
+
+# Where to store the datasets
+DATA_TRAIN_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data_train.tfrecords"
+DATA_VAL_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data_val.tfrecords"
 
 PATH_SAVED_MODEL = ROOT_PATH + "/out/badura/saved_model"
 PATH_CHECKPOINT = ROOT_PATH + "/out/badura/checkpoint"
@@ -42,12 +46,12 @@ STOP_TOKEN = 2
 # === Parameters ===
 # ==================
 
-TRAIN_VAL_SPLIT = 0.95
-BATCH_SIZE = 1
+TRAIN_VAL_SPLIT = 0.85
+BATCH_SIZE = 32
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
-EPOCHS = 1  # 32
+EPOCHS = 32
 
 # How often the encoder / decoder should be stacked
 NUM_LAYERS = 6  # 4

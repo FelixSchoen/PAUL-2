@@ -1,6 +1,7 @@
 import copy
 import math
 import os.path
+import random
 import re
 from multiprocessing import Pool
 
@@ -9,24 +10,24 @@ import numpy as np
 import tensorflow as tf
 from sCoda import Composition, Bar
 
-from src.config.settings import SEQUENCE_MAX_LENGTH, DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH, \
-    CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED, DATA_SET_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE
+from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
+    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
+    SHUFFLE_SEED, DATA_TRAIN_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load, get_project_root
 
 
-def load_and_store_records(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH):
-    bars = load_stored_bars(directory=directory)
+def load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH):
+    bars = load_stored_bars(directory=input_dir)
     data_rows = map(_bar_tuple_to_token_tuple, bars)
     data_rows = filter(_filter_length, data_rows)
     data_rows = map(_pad_tuples, data_rows)
 
     pool = Pool()
     options = tf.io.TFRecordOptions(compression_type="GZIP")
-    with tf.io.TFRecordWriter(get_project_root() + "/out/dataset/data.tfrecords",
+    with tf.io.TFRecordWriter(get_project_root() + output_path,
                               options=options) as writer:
         for example in pool.map(_serialize_example, list(data_rows)):
             writer.write(example)
@@ -47,9 +48,7 @@ def load_dataset_from_bars(bars: [([Bar], [Bar])]):
     return ds
 
 
-def load_dataset_from_records(files=None):
-    if files is None:
-        files = [DATA_SET_OUTPUT_FILE_PATH]
+def load_dataset_from_records(files):
     raw_dataset = tf.data.TFRecordDataset(files, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
 
     feature_desc = {
@@ -68,16 +67,10 @@ def load_dataset_from_records(files=None):
              tf.cast(dictionary["acmp_dif"], dtype=D_TYPE),
              ])
 
-    ds = raw_dataset.map(_parse_function) \
-        .cache() \
-        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
-        .batch(BATCH_SIZE, drop_remainder=True) \
-        .prefetch(tf.data.AUTOTUNE)
-
-    return ds
+    return raw_dataset.map(_parse_function)
 
 
-def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
+def load_oom_dataset(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
     ds = tf.data.Dataset.from_generator(_bar_generator, output_signature=(
         tf.TensorSpec(shape=(4, 512), dtype=D_TYPE)
     ), args=[directory]) \
@@ -88,7 +81,7 @@ def load_oom_dataset(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH, buff
     return ds
 
 
-def load_stored_bars(directory=DATA_COMPOSITIONS_PICKLE_OUTPUT_FOLDER_PATH) -> [([Bar], [Bar])]:
+def load_stored_bars(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH) -> [([Bar], [Bar])]:
     """ Loads the stored bars from the given directory into memory.
 
     Args:
@@ -130,7 +123,7 @@ def load_midi_files(directory: str, flags=None) -> list:
 
     # Handle all MIDI files in the given directory and subdirectories
     for dir_path, _, filenames in os.walk(directory):
-        for filename in [f for f in filenames if f.endswith(".zip")]:
+        for filename in [f for f in filenames if f.endswith(".mid")]:
             files.append((os.path.join(dir_path, filename), filename))
 
     # Separate into chunks in order to process in parallel
@@ -366,9 +359,10 @@ def _load_midi_files(files, flags: list) -> list:
     processed_files = []
 
     for filepath, filename in files:
-        zip_file_path = DATA_COMPOSITIONS_PICKLE_OUTPUT_FILE_PATH.format(filename[:-4])
+        train_zip_file_path = (DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH + "/{0}.zip").format(filename[:-4])
+        val_zip_file_path = (DATA_BARS_VAL_OUTPUT_FOLDER_PATH + "/{0}.zip").format(filename[:-4])
 
-        if file_exists(zip_file_path) and "skip_skip" not in flags:
+        if file_exists(train_zip_file_path) and "skip_skip" not in flags:
             logger.info(f"Skipping {filename}.")
             continue
 
@@ -384,14 +378,24 @@ def _load_midi_files(files, flags: list) -> list:
         if "skip_difficulty" not in flags:
             _calculate_difficulty(extracted_bars)
 
+        # Shuffle bars
+        random.shuffle(extracted_bars)
+
+        split_point = int((len(extracted_bars) + 1) * TRAIN_VAL_SPLIT)
+        train_extracted_bars = extracted_bars[:split_point]
+        val_extracted_bars = extracted_bars[split_point:]
+
         # Augment bars
-        augmented_bars = flatten(list(map(_augment_bar, extracted_bars)))
+        train_augmented_bars = flatten(list(map(_augment_bar, train_extracted_bars)))
+        val_augmented_bars = flatten(list(map(_augment_bar, val_extracted_bars)))
 
         # Store to file
         if "skip_store" not in flags:
-            pickle_save(augmented_bars, zip_file_path)
+            pickle_save(train_augmented_bars, train_zip_file_path)
+            pickle_save(val_augmented_bars, val_zip_file_path)
 
-        processed_files.append(augmented_bars)
+        processed_files.append(train_augmented_bars)
+        processed_files.append(val_augmented_bars)
 
         logger.info(f"Finished processing {filename}.")
 

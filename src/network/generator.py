@@ -34,3 +34,5 @@ class Generator(tf.Module):
         # Calculate attention
         output_tensor = tf.expand_dims(output_tensor_array.stack(), 0)
         _, attention_weights = self.transformer([input_tensors, output_tensor], training=False)
+
+        return output_tensor, attention_weights
