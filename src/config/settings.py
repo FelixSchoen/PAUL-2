@@ -46,8 +46,8 @@ STOP_TOKEN = 2
 # === Parameters ===
 # ==================
 
-TRAIN_VAL_SPLIT = 0.85
-BATCH_SIZE = 32
+TRAIN_VAL_SPLIT = 0.9
+BATCH_SIZE = 64
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 

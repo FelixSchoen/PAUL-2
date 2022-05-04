@@ -16,7 +16,7 @@ from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH,
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
-from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load, get_project_root
+from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
 
 def load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH):
@@ -27,8 +27,7 @@ def load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_
 
     pool = Pool()
     options = tf.io.TFRecordOptions(compression_type="GZIP")
-    with tf.io.TFRecordWriter(get_project_root() + output_path,
-                              options=options) as writer:
+    with tf.io.TFRecordWriter(output_path, options=options) as writer:
         for example in pool.map(_serialize_example, list(data_rows)):
             writer.write(example)
 
@@ -108,6 +107,9 @@ def load_stored_bars(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH) -> [([Bar], [
 
 def load_midi_files(directory: str, flags=None) -> list:
     """ Loads the MIDI files from the drive, processes them, and stores the processed files.
+
+    Applies a train / validation split according to the percentage given in the settings, and stores the processed bars
+    in different directories regarding their split.
 
     Args:
         directory: The directory to load the files from
