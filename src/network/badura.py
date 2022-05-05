@@ -55,7 +55,8 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
                                   target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
                                   num_encoders=1,
-                                  mask_types=[MaskType.lookahead],
+                                  mask_types_enc=[MaskType.singleout],
+                                  mask_types_dec=[MaskType.singleout],
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
 
@@ -72,7 +73,8 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   input_vocab_sizes=[INPUT_VOCAB_SIZE_MLD, INPUT_VOCAB_SIZE_DIF],
                                   target_vocab_size=ACMP_OUTPUT_VOCAB_SIZE,
                                   num_encoders=2,
-                                  mask_types=[MaskType.padding, MaskType.singleout],
+                                  mask_types_enc=[MaskType.padding, MaskType.singleout],
+                                  mask_types_dec=[MaskType.padding, MaskType.singleout],
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
 

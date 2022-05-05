@@ -3,7 +3,8 @@ import tensorflow as tf
 from src.config.settings import SEQUENCE_MAX_LENGTH, D_TYPE
 from src.exception.exceptions import UnexpectedValueException
 from src.network.layers import EncoderLayer, DecoderLayer
-from src.network.masking import create_padding_mask, create_combined_mask, MaskType, create_single_out_mask
+from src.network.masking import create_padding_mask, create_combined_mask, MaskType, create_single_out_mask, \
+    create_look_ahead_mask
 from src.network.positional_encoding import positional_encoding
 
 
@@ -95,13 +96,16 @@ class Decoder(tf.keras.layers.Layer):
 
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_sizes, target_vocab_size, num_encoders,
-                 mask_types, attention_type, max_relative_distance, rate=0.1):
+                 mask_types_enc, mask_types_dec, attention_type, max_relative_distance, rate=0.1):
         super().__init__()
 
         self.num_encoders = num_encoders
-        self.mask_types = mask_types
+        self.mask_types_enc = mask_types_enc
+        self.mask_types_dec = mask_types_dec
 
         assert num_encoders == len(input_vocab_sizes)
+        assert num_encoders == len(mask_types_enc)
+        assert num_encoders == len(mask_types_dec)
 
         self.encoders = [
             Encoder(num_layers=num_layers, d_model=d_model, num_heads=num_heads, dff=dff,
@@ -120,29 +124,16 @@ class Transformer(tf.keras.Model):
         # Pass all inputs in first argument
         inputs, target = omni_input
 
-        # Create masks for encoder
+        # Create encoder masks
         enc_masks = []
-        for inp in inputs:
-            enc_masks.append(create_padding_mask(inp))
+        for inp, mask_type in zip(inputs, self.mask_types_dec):
+            enc_masks.append(Transformer._build_mask(mask_type, inp))
 
-        # Create masks for decoder
+        # Create decoder masks
         dec_self_attention_mask = create_combined_mask(target)
         dec_masks = []
-        for inp, mask_type in zip(inputs, self.mask_types):
-            if mask_type == MaskType.padding:
-                dec_masks.append(create_padding_mask(inp))
-            elif mask_type == MaskType.lookahead:
-                # Create lookahead mask, remove last entry to fit shape of input
-                dec_mask = create_combined_mask(inp)
-                dec_mask = dec_mask[:, :, 1:, :]
-                dec_masks.append(dec_mask)
-            elif mask_type == MaskType.singleout:
-                # Create singleout mask, remove last entry to fit shape of input
-                dec_mask = create_combined_mask(inp, mask_fn=create_single_out_mask)
-                dec_mask = dec_mask[:, :, 1:, :]
-                dec_masks.append(dec_mask)
-            else:
-                raise UnexpectedValueException("Unknown masking type")
+        for inp, mask_type in zip(inputs, self.mask_types_dec):
+            dec_masks.append(Transformer._build_mask(mask_type, inp, shift_by=1))
 
         # Collect Encoder Outputs
         enc_outputs = []
@@ -167,3 +158,18 @@ class Transformer(tf.keras.Model):
         target = _get_uniform()[:, :-1]
 
         _, _ = self([inputs, target], False)
+
+    @staticmethod
+    def _build_mask(mask_type, inp, shift_by=0):
+        if mask_type == MaskType.padding:
+            mask = create_padding_mask(inp)
+        elif mask_type == MaskType.lookahead:
+            mask = create_combined_mask(inp, mask_fn=create_look_ahead_mask)
+            mask = mask[:, :, shift_by:, :]
+        elif mask_type == MaskType.singleout:
+            mask = create_combined_mask(inp, mask_fn=create_single_out_mask)
+            mask = mask[:, :, shift_by:, :]
+        else:
+            raise UnexpectedValueException("Unknown masking type")
+
+        return mask
