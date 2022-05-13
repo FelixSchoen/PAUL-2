@@ -1,8 +1,8 @@
-# Name of the root logger
 import tensorflow as tf
 
 from src.util.util import get_project_root
 
+# Name of the root logger
 ROOT_LOGGER = "badura"
 
 ROOT_PATH = get_project_root()
@@ -47,19 +47,19 @@ STOP_TOKEN = 2
 # ==================
 
 TRAIN_VAL_SPLIT = 0.9
-BATCH_SIZE = 64
+BATCH_SIZE = 16  # 64
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
 EPOCHS = 32
 
+# Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
-NUM_LAYERS = 6  # 4
 # Number of attention heads
-NUM_HEADS = 8
 # Dimension of the model
-D_MODEL = 256  # 128
 # Dimension of the feed-forward network
-DFF = 1024  # 512
 # Dropout rate applied after some operations
-DROPOUT_RATE = 0.1
+SETTINGS_LEAD_TRANSFORMER = {"NUM_LAYERS": 4, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024, "DROPOUT_RATE": 0.2,
+                             "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
+SETTINGS_ACMP_TRANSFORMER = {"NUM_LAYERS": 6, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024, "DROPOUT_RATE": 0.1,
+                             "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}

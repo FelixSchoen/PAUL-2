@@ -5,19 +5,20 @@ from datetime import datetime
 from enum import Enum
 
 import tensorflow as tf
+from sCoda import Sequence, Message
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
-from src.config.settings import NUM_LAYERS, D_MODEL, NUM_HEADS, DFF, LEAD_OUTPUT_VOCAB_SIZE, \
+from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
-    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, D_TYPE, \
-    DATA_TRAIN_OUTPUT_FILE_PATH, DATA_VAL_OUTPUT_FILE_PATH, BATCH_SIZE
+    PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
+    DATA_VAL_OUTPUT_FILE_PATH, BATCH_SIZE, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER
 from src.network.attention import AttentionType
 from src.network.generator import Generator
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
-from src.preprocessing.data_pipeline import load_dataset_from_records, Tokenizer
+from src.preprocessing.data_pipeline import load_dataset_from_records
 from src.util.logging import get_logger
 from src.util.util import get_src_root
 
@@ -47,11 +48,17 @@ def get_strategy():
 
 def get_network_objects(network_type, *, strategy=None, optimizer=None, train_loss=None, train_accuracy=None,
                         val_loss=None, val_accuracy=None):
+    settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
+    num_layers = settings["NUM_LAYERS"]
+    d_model = settings["D_MODEL"]
+    num_heads = settings["NUM_HEADS"]
+    dff = settings["DFF"]
+
     if network_type == NetworkType.lead:
-        transformer = Transformer(num_layers=NUM_LAYERS,
-                                  d_model=D_MODEL,
-                                  num_heads=NUM_HEADS,
-                                  dff=DFF,
+        transformer = Transformer(num_layers=num_layers,
+                                  d_model=d_model,
+                                  num_heads=num_heads,
+                                  dff=dff,
                                   input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF],
                                   target_vocab_size=LEAD_OUTPUT_VOCAB_SIZE,
                                   num_encoders=1,
@@ -59,17 +66,11 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   mask_types_dec=[MaskType.singleout],
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
-
-        trainer = Trainer(transformer=transformer, optimizer=optimizer,
-                          train_loss=train_loss, train_accuracy=train_accuracy,
-                          val_loss=val_loss, val_accuracy=val_accuracy, strategy=strategy)
-
-        return transformer, trainer
     elif network_type == NetworkType.acmp:
-        transformer = Transformer(num_layers=NUM_LAYERS,
-                                  d_model=D_MODEL,
-                                  num_heads=NUM_HEADS,
-                                  dff=DFF,
+        transformer = Transformer(num_layers=num_layers,
+                                  d_model=d_model,
+                                  num_heads=num_heads,
+                                  dff=dff,
                                   input_vocab_sizes=[INPUT_VOCAB_SIZE_MLD, INPUT_VOCAB_SIZE_DIF],
                                   target_vocab_size=ACMP_OUTPUT_VOCAB_SIZE,
                                   num_encoders=2,
@@ -77,14 +78,14 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   mask_types_dec=[MaskType.padding, MaskType.singleout],
                                   attention_type=AttentionType.relative,
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
-
-        trainer = Trainer(transformer=transformer, optimizer=optimizer,
-                          train_loss=train_loss, train_accuracy=train_accuracy,
-                          val_loss=val_loss, val_accuracy=val_accuracy, strategy=strategy)
-
-        return transformer, trainer
     else:
         raise NotImplementedError
+
+    trainer = Trainer(transformer=transformer, optimizer=optimizer,
+                      train_loss=train_loss, train_accuracy=train_accuracy,
+                      val_loss=val_loss, val_accuracy=val_accuracy, strategy=strategy)
+
+    return transformer, trainer
 
 
 def train_network(network_type, start_epoch=0):
@@ -124,8 +125,15 @@ def train_network(network_type, start_epoch=0):
 
         logger.info("Constructing model...")
 
+        # Load settings
+        settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
+        num_layers = settings["NUM_LAYERS"]
+        d_model = settings["D_MODEL"]
+        num_heads = settings["NUM_HEADS"]
+        dff = settings["DFF"]
+
         # Load learning rate
-        learning_rate = TransformerLearningRateSchedule(D_MODEL)
+        learning_rate = TransformerLearningRateSchedule(d_model)
 
         # Load optimizer
         optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
@@ -143,12 +151,14 @@ def train_network(network_type, start_epoch=0):
         # For restarting at a later epoch
         start_epoch = tf.Variable(start_epoch)
 
+        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+
         # Set checkpoint
         checkpoint = tf.train.Checkpoint(transformer=transformer,
                                          optimizer=optimizer,
                                          epoch=start_epoch)
-        checkpoint_path = PATH_CHECKPOINT + "/" + network_type.value
-        checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=10)
+        checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {current_time}"
+        checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
 
         # If checkpoint exists, restore it
         if checkpoint_manager.latest_checkpoint:
@@ -158,9 +168,8 @@ def train_network(network_type, start_epoch=0):
                 f"iterations already completed.")
 
         # Tensorboard setup
-        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        train_log_dir = PATH_TENSORBOARD + "/" + current_time + '/train'
-        val_log_dir = PATH_TENSORBOARD + "/" + current_time + '/val'
+        train_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{current_time}/train"
+        val_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{current_time}/val"
         train_summary_writer = tf.summary.create_file_writer(train_log_dir)
         val_summary_writer = tf.summary.create_file_writer(val_log_dir)
 
@@ -219,7 +228,7 @@ def train_network(network_type, start_epoch=0):
                 batch_timer = time.time()
                 tf.config.experimental.reset_memory_stats("GPU:0")
 
-            logger.info(f"[E{epoch + 1:02d}]: Calculation validation statistics...")
+            logger.info(f"[E{epoch + 1:02d}]: Calculating validation statistics...")
 
             # Validation batches
             for (batch_num, batch) in enumerate(val_distributed_ds):
@@ -261,17 +270,13 @@ def generate(network_type, model_identifier, difficulty):
     transformer.build_model()
     transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
 
-    generator = Generator(transformer)
+    generator = Generator(transformer, network_type)
 
-    # Build difficulty tensor
-    tokenizer = Tokenizer()
-    dif_seq = [tokenizer.tokenize_difficulty((difficulty - 1) / 10) for _ in range(SEQUENCE_MAX_LENGTH - 2)]
-    dif_seq.insert(0, 1)
-    dif_seq.append(2)
-    dif_tensor = tf.convert_to_tensor(dif_seq, dtype=D_TYPE)
-    dif_tensor = tf.expand_dims(dif_tensor, 0)
+    # Create starting sequence
+    seq = Sequence()
+    seq.add_relative_message(Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
 
-    generator([dif_tensor])
+    generator.new_call(start_sequence=seq, difficulty=difficulty, temperature=0)
 
 
 def _load_data(network_type, batch):

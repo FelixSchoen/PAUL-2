@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 import tensorflow as tf
 
 
@@ -25,3 +26,12 @@ def test_different_dimensions():
 
     logging.info(f"Shape z: {tf.shape(z)}")
     logging.info(f"z: {z}")
+
+
+def test_categorical():
+    samples = tf.random.categorical(tf.math.log([[0, 0.5]]), 5)
+
+    print(samples)
+    print(tf.math.log([[0, 0.5]]))
+
+    print(0*-np.inf)

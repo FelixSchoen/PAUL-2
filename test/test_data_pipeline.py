@@ -58,6 +58,26 @@ def test_detokenization():
     assert len(generated_messages) == 215
 
 
+def test_tokenization_roundtrip():
+    messages = [{"message_type": "wait", "time": 24}, {"message_type": "note_on", "note": 50}]
+
+    tokenizer = Tokenizer()
+    detokenizer = Detokenizer()
+
+    token = []
+    for msg in messages:
+        token.extend(tokenizer.tokenize(msg))
+    token.extend(tokenizer.flush_wait_buffer())
+
+    detoken = []
+    for tok in token:
+        detoken.extend(detokenizer.detokenize(tok))
+    detoken.extend(detokenizer.flush_wait_buffer())
+
+    for i, det in enumerate(detoken):
+        assert det == messages[i]
+
+
 def test_tokenization_difficulty():
     tokenizer = Tokenizer()
 

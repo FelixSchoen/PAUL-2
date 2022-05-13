@@ -9,10 +9,11 @@ import mido
 import numpy as np
 import tensorflow as tf
 from sCoda import Composition, Bar
+from sCoda.elements.message import MessageType
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BUFFER_SIZE, BATCH_SIZE, VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
-    SHUFFLE_SEED, DATA_TRAIN_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
+    VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
+    DATA_TRAIN_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
@@ -30,21 +31,6 @@ def load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_
     with tf.io.TFRecordWriter(output_path, options=options) as writer:
         for example in pool.map(_serialize_example, list(data_rows)):
             writer.write(example)
-
-
-def load_dataset_from_bars(bars: [([Bar], [Bar])]):
-    data_rows = map(_bar_tuple_to_token_tuple, bars)
-    data_rows = filter(_filter_length, data_rows)
-    data_rows = map(_pad_tuples, data_rows)
-
-    # Construct dataset
-    ds = tf.data.Dataset.from_tensor_slices(list(data_rows)) \
-        .cache() \
-        .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED) \
-        .batch(BATCH_SIZE) \
-        .prefetch(tf.data.AUTOTUNE)
-
-    return ds
 
 
 def load_dataset_from_records(files):
@@ -67,17 +53,6 @@ def load_dataset_from_records(files):
              ])
 
     return raw_dataset.map(_parse_function)
-
-
-def load_oom_dataset(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, buffer_size=BUFFER_SIZE):
-    ds = tf.data.Dataset.from_generator(_bar_generator, output_signature=(
-        tf.TensorSpec(shape=(4, 512), dtype=D_TYPE)
-    ), args=[directory]) \
-        .shuffle(buffer_size, seed=SHUFFLE_SEED) \
-        .batch(BATCH_SIZE) \
-        .prefetch(tf.data.AUTOTUNE)
-
-    return ds
 
 
 def load_stored_bars(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH) -> [([Bar], [Bar])]:
@@ -189,39 +164,6 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
             bar.set_difficulty()
 
     return bar_chunks
-
-
-def _bar_generator(directory):
-    logger = get_logger(__name__)
-    files = []
-
-    # Directory given in binary
-    for dir_path, _, filenames in os.walk(directory.decode("utf-8")):
-        for filename in [f for f in filenames if f.endswith(".zip")]:
-            files.append((os.path.join(dir_path, filename), filename))
-
-    def _bars_generator(files_list):
-        for file in files_list:
-            logger.info(f"Loading {file[0]}")
-            bars = pickle_load(file[0])
-
-            if len(bars) == 0:
-                continue
-
-            yield bars
-
-    def _tensor_generator():
-        for bars in _bars_generator(files):
-            for bar in bars:
-                tensors = _bar_tuple_to_token_tuple(bar)
-
-                if not _filter_length(tensors):
-                    continue
-
-                data_row = _pad_tuples(tensors)
-                yield data_row
-
-    return _tensor_generator()
 
 
 def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
@@ -509,24 +451,25 @@ class Tokenizer:
     def tokenize(self, entry):
         msg_type = entry["message_type"]
 
-        if msg_type == "wait":
+        if msg_type == MessageType.wait.value:
             value = int(entry["time"])
             self.wait_buffer += value
             return []
-        elif msg_type == "note_on":
+        elif msg_type == MessageType.note_on.value:
             shifter = 3 + 24
             value = int(entry["note"]) - 21
-        elif msg_type == "note_off":
+        elif msg_type == MessageType.note_off.value:
             shifter = 3 + 24 + 88
             value = int(entry["note"]) - 21
-        elif msg_type == "time_signature":
-            if "skip_time_signature" in self.flags:
+        elif msg_type == MessageType.time_signature.value:
+            if self.flags.get("skip_time_signature", False):
                 return []
 
             shifter = 3 + 24 + 88 + 88
             signature = (int(entry["numerator"]), int(entry["denominator"]))
             value = VALID_TIME_SIGNATURES.index(signature)
         else:
+            print(msg_type)
             raise UnexpectedValueException
 
         tokens = self.flush_wait_buffer()
