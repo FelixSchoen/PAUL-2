@@ -2,7 +2,6 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime
-from enum import Enum
 
 import tensorflow as tf
 from sCoda import Sequence, Message
@@ -11,7 +10,7 @@ from tensorflow.python.data.ops.options import AutoShardPolicy
 from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_VAL_OUTPUT_FILE_PATH, BATCH_SIZE, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER
+    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER
 from src.network.attention import AttentionType
 from src.network.generator import Generator
 from src.network.masking import MaskType
@@ -19,13 +18,9 @@ from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
 from src.preprocessing.data_pipeline import load_dataset_from_records
+from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 from src.util.util import get_src_root
-
-
-class NetworkType(Enum):
-    lead = "lead"
-    acmp = "acmp"
 
 
 def get_strategy():
@@ -101,6 +96,14 @@ def train_network(network_type, start_epoch=0):
         context = strategy.scope()
 
     with context:
+        # Load settings
+        settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
+        num_layers = settings["NUM_LAYERS"]
+        d_model = settings["D_MODEL"]
+        num_heads = settings["NUM_HEADS"]
+        dff = settings["DFF"]
+        batch_size = settings["BATCH_SIZE"]
+
         logical_gpus = tf.config.list_logical_devices("GPU")
         logger.info(f"Running with {logical_gpus} virtual GPUs...")
 
@@ -114,23 +117,16 @@ def train_network(network_type, start_epoch=0):
         val_ds = val_ds.with_options(options)
 
         # Count batches
-        amount_train_batches = len(list(train_ds.batch(BATCH_SIZE).as_numpy_iterator()))
+        amount_train_batches = len(list(train_ds.batch(batch_size).as_numpy_iterator()))
         logger.info(f"Train dataset consists of {amount_train_batches} batches.")
 
-        amount_val_batches = len(list(val_ds.batch(BATCH_SIZE).as_numpy_iterator()))
+        amount_val_batches = len(list(val_ds.batch(batch_size).as_numpy_iterator()))
         logger.info(f"Validation dataset consists of {amount_val_batches} batches.")
 
         amount_batches = amount_train_batches + amount_val_batches
         logger.info(f"Overall dataset consists of {amount_batches} batches.")
 
         logger.info("Constructing model...")
-
-        # Load settings
-        settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
-        num_layers = settings["NUM_LAYERS"]
-        d_model = settings["D_MODEL"]
-        num_heads = settings["NUM_HEADS"]
-        dff = settings["DFF"]
 
         # Load learning rate
         learning_rate = TransformerLearningRateSchedule(d_model)
@@ -179,12 +175,12 @@ def train_network(network_type, start_epoch=0):
             train_distributed_ds = train_ds \
                 .cache() \
                 .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch) \
-                .batch(BATCH_SIZE) \
+                .batch(batch_size) \
                 .prefetch(tf.data.AUTOTUNE)
             val_distributed_ds = val_ds \
                 .cache() \
                 .shuffle(BUFFER_SIZE, seed=SHUFFLE_SEED + epoch) \
-                .batch(BATCH_SIZE) \
+                .batch(batch_size) \
                 .prefetch(tf.data.AUTOTUNE)
 
             # Distribute datasets

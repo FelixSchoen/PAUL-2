@@ -46,8 +46,7 @@ STOP_TOKEN = 2
 # === Parameters ===
 # ==================
 
-TRAIN_VAL_SPLIT = 0.9
-BATCH_SIZE = 16  # 64
+TRAIN_VAL_SPLIT = 0.95
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
@@ -59,7 +58,7 @@ EPOCHS = 32
 # Dimension of the model
 # Dimension of the feed-forward network
 # Dropout rate applied after some operations
-SETTINGS_LEAD_TRANSFORMER = {"NUM_LAYERS": 4, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024, "DROPOUT_RATE": 0.2,
+SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 4, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024, "DROPOUT_RATE": 0.2,
                              "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
-SETTINGS_ACMP_TRANSFORMER = {"NUM_LAYERS": 6, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024, "DROPOUT_RATE": 0.1,
+SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024, "DROPOUT_RATE": 0.1,
                              "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}

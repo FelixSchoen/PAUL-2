@@ -136,10 +136,8 @@ def _augment_bar(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
 
         # Handle bars at the same time
         for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
-            if lead_bar.transpose(transpose_by):
-                lead_bar.set_difficulty()
-            if acmp_bar.transpose(transpose_by):
-                acmp_bar.set_difficulty()
+            lead_bar.difficulty()
+            acmp_bar.difficulty()
 
             # Append transposed bars to the placeholder objects
             lead_bars.append(lead_bar)
@@ -159,9 +157,9 @@ def _calculate_difficulty(bar_chunks: [([Bar], [Bar])]) -> [([Bar], [Bar])]:
     """
     for chunk in bar_chunks:
         for bar in chunk[0]:
-            bar.set_difficulty()
+            bar.difficulty()
         for bar in chunk[1]:
-            bar.set_difficulty()
+            bar.difficulty()
 
     return bar_chunks
 
@@ -273,7 +271,7 @@ def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]
 
 def _filter_length(to_filter):
     length = max([tf.shape(x)[0] for x in to_filter])
-    return length <= SEQUENCE_MAX_LENGTH
+    return length <= SEQUENCE_MAX_LENGTH - 2  # Leave space for start and stop messages
 
 
 def _find_word(word, sentence) -> re.Match:

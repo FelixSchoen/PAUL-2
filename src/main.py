@@ -2,7 +2,8 @@ import argparse
 
 from src.config.settings import DATA_MIDI_INPUT_PATH, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH
-from src.network.badura import train_network, NetworkType, generate
+from src.network.badura import train_network, generate
+from src.util.enumerations import NetworkType
 from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
 from src.util.logging import get_logger
 
