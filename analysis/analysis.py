@@ -6,12 +6,12 @@ from matplotlib import pyplot as plt
 
 from src.config.settings import ROOT_PATH, DIFFICULTY_VALUE_SCALE
 from src.network.generator import TemperatureSchedule
-from src.preprocessing.data_pipeline import load_stored_bars
+from src.preprocessing.data_pipeline import _load_bars_from_zip
 
 
 def test_analysis():
     # bars = load_stored_bars(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH)
-    bars = load_stored_bars(directory=ROOT_PATH + "/out/bars/misc")
+    bars = _load_bars_from_zip(directory=ROOT_PATH + "/out/bars/misc")
 
     lead_difs = []
     acmp_difs = []

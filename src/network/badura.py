@@ -18,7 +18,7 @@ from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
-from src.preprocessing.data_pipeline import load_dataset_from_records
+from src.preprocessing.data_pipeline import load_records
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 from src.util.util import get_src_root
@@ -106,8 +106,8 @@ def train_network(network_type, start_epoch=0):
         logger.info(f"Running with {len(logical_gpus)} virtual GPUs...")
 
         logger.info("Loading dataset...")
-        train_ds = load_dataset_from_records(files=[DATA_TRAIN_OUTPUT_FILE_PATH])
-        val_ds = load_dataset_from_records(files=[DATA_VAL_OUTPUT_FILE_PATH])
+        train_ds = load_records(files=[DATA_TRAIN_OUTPUT_FILE_PATH])
+        val_ds = load_records(files=[DATA_VAL_OUTPUT_FILE_PATH])
 
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
