@@ -18,7 +18,7 @@ from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
 from src.network.transformer import Transformer
-from src.preprocessing.data_pipeline import load_records
+from src.preprocessing.preprocessing import load_records
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 from src.util.util import get_src_root

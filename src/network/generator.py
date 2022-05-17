@@ -5,7 +5,7 @@ from sCoda.elements.message import MessageType, Message
 
 from src.config.settings import D_TYPE, START_TOKEN, SEQUENCE_MAX_LENGTH, STOP_TOKEN, SETTINGS_LEAD_TRANSFORMER, \
     SETTINGS_ACMP_TRANSFORMER, VALID_TIME_SIGNATURES
-from src.preprocessing.data_pipeline import Tokenizer, Detokenizer
+from src.preprocessing.preprocessing import Tokenizer, Detokenizer
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 

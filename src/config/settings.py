@@ -3,7 +3,7 @@ import tensorflow as tf
 from src.util.util import get_project_root
 
 # Name of the root logger
-ROOT_LOGGER = "badura"
+ROOT_LOGGER = "paul"
 
 ROOT_PATH = get_project_root()
 
@@ -19,7 +19,7 @@ DATA_BARS_VAL_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/bars/val"
 DATA_TRAIN_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data_train.tfrecords"
 DATA_VAL_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data_val.tfrecords"
 
-PATH_OUT_PAUL = "/out/badura"
+PATH_OUT_PAUL = "/out/paul"
 PATH_SAVED_MODEL = ROOT_PATH + PATH_OUT_PAUL + "/saved_model"
 PATH_CHECKPOINT = ROOT_PATH + PATH_OUT_PAUL + "/checkpoint"
 PATH_MIDI = ROOT_PATH + PATH_OUT_PAUL + "/gen"

@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 from src.config.settings import ROOT_PATH, DIFFICULTY_VALUE_SCALE
 from src.network.generator import TemperatureSchedule
-from src.preprocessing.data_pipeline import _load_bars_from_zip
+from src.preprocessing.preprocessing import _load_bars_from_zip
 
 
 def test_analysis():
