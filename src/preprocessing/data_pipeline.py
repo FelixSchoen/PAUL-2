@@ -188,7 +188,7 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
             tokens = tokenizer.flush_wait_buffer()
 
             seq.extend(tokens)
-            dif.extend([tokenizer.tokenize_difficulty(bar.difficulty) for _ in range(0, len(seq))])
+            dif.extend([tokenizer.tokenize_difficulty(bar.difficulty()) for _ in range(0, len(seq))])
 
         # Add start and stop messages
         seq.insert(0, START_TOKEN)
@@ -467,7 +467,6 @@ class Tokenizer:
             signature = (int(entry["numerator"]), int(entry["denominator"]))
             value = VALID_TIME_SIGNATURES.index(signature)
         else:
-            print(msg_type)
             raise UnexpectedValueException
 
         tokens = self.flush_wait_buffer()

@@ -20,7 +20,6 @@ class Generator(tf.Module):
     @tf.function
     def new_call(self, start_sequence, difficulty, temperature=0, bars=4):
         assert not (self.network_type == NetworkType.acmp and self.lead_sequence is None)
-        assert len(start_sequence._get_rel().messages) <= SEQUENCE_MAX_LENGTH - 2
 
         # Initialise objects
         output_sequence = Sequence()
@@ -42,26 +41,28 @@ class Generator(tf.Module):
 
         # Build lead tensor
         if self.network_type == NetworkType.acmp:
-            lead_tensor_array = Generator._create_tensor_from_sequence(self.lead_sequence, write_stop_token=True)
+            lead_tensor_array, _ = Generator._create_tensor_from_sequence(self.lead_sequence, write_stop_token=True)
+            lead_tensor = tf.expand_dims(lead_tensor_array.stack(), 0)
 
         # Build output tensor
-        output_tensor_array = Generator._create_tensor_from_sequence(start_sequence, write_stop_token=False)
+        output_tensor_array, len_input_seq = Generator._create_tensor_from_sequence(start_sequence,
+                                                                                    write_stop_token=False)
 
         # Create input tensors
         if self.network_type == NetworkType.lead:
             input_tensors = [dif_tensor]
         elif self.network_type == NetworkType.acmp:
-            raise NotImplementedError
+            input_tensors = [lead_tensor, dif_tensor]
         else:
             raise NotImplementedError
 
         # Loop for up to remaining tokens time
-        for i in tf.range(1 + len(tokens), SEQUENCE_MAX_LENGTH - 1):
+        for i in tf.range(1 + len_input_seq, SEQUENCE_MAX_LENGTH - 1):
             output_tensor = tf.expand_dims(output_tensor_array.stack(), 0)
 
             # Interference
             predictions, _ = self.transformer([input_tensors, output_tensor], training=False)
-            prediction_tensor = predictions[:, i]  # TODO Different, uses -1 instead of i, makes no sense to me
+            prediction_tensor = predictions[:, i]  # TODO Check no off-by-one error
 
             # Create and apply valid messages mask
             valid_next_messages = output_sequence._get_rel().get_valid_next_messages(desired_bars=bars,
@@ -80,6 +81,10 @@ class Generator(tf.Module):
             # Write prediction to output tensor
             output_tensor_array.write(i + 1, prediction)
 
+            # Check if end of sequence was predicted
+            if prediction == STOP_TOKEN:
+                break
+
             # Add to sequence
             detokens = detokenizer.detokenize(prediction)
             detokens.extend(detokenizer.flush_wait_buffer())
@@ -92,35 +97,7 @@ class Generator(tf.Module):
         output_tensor = tf.expand_dims(output_tensor_array.stack(), 0)
         _, attention_weights = self.transformer([input_tensors, output_tensor], training=False)
 
-        return output_tensor, attention_weights
-
-    @tf.function
-    def __call__(self, input_tensors, temperature=1):
-        for input_tensor in input_tensors:
-            assert isinstance(input_tensor, tf.Tensor)
-
-        output_tensor_array = tf.TensorArray(D_TYPE, size=SEQUENCE_MAX_LENGTH - 1, dynamic_size=False)
-        output_tensor_array = output_tensor_array.write(0, START_TOKEN)
-
-        # Loop
-        for i in tf.range(SEQUENCE_MAX_LENGTH - 1):
-            output_tensor = tf.expand_dims(output_tensor_array.stack(), 0)
-
-            predictions, _ = self.transformer([input_tensors, output_tensor], training=False)
-            prediction_tensor = predictions[:, i]  # TODO Different, uses -1 instead of i, makes no sense to me
-
-            if temperature == 0:
-                prediction = tf.argmax(prediction_tensor, axis=-1)[0]
-            else:
-                prediction = tf.random.categorical(prediction_tensor / temperature, 1)[0][0]
-
-            output_tensor_array.write(i + 1, prediction)
-
-        # Calculate attention
-        output_tensor = tf.expand_dims(output_tensor_array.stack(), 0)
-        _, attention_weights = self.transformer([input_tensors, output_tensor], training=False)
-
-        return output_tensor, attention_weights
+        return output_sequence, attention_weights
 
     @staticmethod
     def _create_tensor_from_sequence(sequence, write_stop_token=False):
@@ -134,6 +111,9 @@ class Generator(tf.Module):
         for _, row in data_frame.iterrows():
             tokens.extend(tokenizer.tokenize(row))
         tokens.extend(tokenizer.flush_wait_buffer())
+
+        assert len(tokens) <= SEQUENCE_MAX_LENGTH - 2
+
         for i, token in enumerate(tokens):
             tensor_array = tensor_array.write(i + 1, token)
             end_index = i + 2
@@ -141,7 +121,7 @@ class Generator(tf.Module):
         if write_stop_token:
             tensor_array = tensor_array.write(end_index, STOP_TOKEN)
 
-        return tensor_array
+        return tensor_array, len(tokens)
 
     @staticmethod
     def _create_mask_from_valid_messages(valid_messages, mask_length):
