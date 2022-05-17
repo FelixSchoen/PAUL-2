@@ -20,6 +20,39 @@ from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
 
+def load_midi_files(directory: str, flags=None) -> list:
+    """ Loads the MIDI files from the drive, processes them, and stores the processed files.
+
+    Applies a train / validation split according to the percentage given in the settings, and stores the processed bars
+    in different directories regarding their split.
+
+    Args:
+        directory: The directory to load the files from
+        flags: A list of flags for the processing of files
+
+    Returns: The loaded files
+
+    """
+    if flags is None:
+        flags = []
+
+    files = []
+
+    # Handle all MIDI files in the given directory and subdirectories
+    for dir_path, _, filenames in os.walk(directory):
+        for filename in [f for f in filenames if f.endswith(".mid")]:
+            files.append((os.path.join(dir_path, filename), filename))
+
+    # Separate into chunks in order to process in parallel
+    files_chunks = list(chunks(files, 1))
+
+    pool = Pool()
+    loaded_files = pool.starmap(_load_midi_files,
+                                zip(files_chunks, [copy.copy(flags) for _ in range(0, len(files_chunks))]))
+
+    return flatten(loaded_files)
+
+
 def load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH):
     bars = load_stored_bars(directory=input_dir)
     data_rows = map(_bar_tuple_to_token_tuple, bars)
@@ -78,39 +111,6 @@ def load_stored_bars(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH) -> [([Bar], [
     bars = flatten(pool.map(_load_stored_bars, files_chunks))
 
     return bars
-
-
-def load_midi_files(directory: str, flags=None) -> list:
-    """ Loads the MIDI files from the drive, processes them, and stores the processed files.
-
-    Applies a train / validation split according to the percentage given in the settings, and stores the processed bars
-    in different directories regarding their split.
-
-    Args:
-        directory: The directory to load the files from
-        flags: A list of flags for the processing of files
-
-    Returns: The loaded files
-
-    """
-    if flags is None:
-        flags = []
-
-    files = []
-
-    # Handle all MIDI files in the given directory and subdirectories
-    for dir_path, _, filenames in os.walk(directory):
-        for filename in [f for f in filenames if f.endswith(".mid")]:
-            files.append((os.path.join(dir_path, filename), filename))
-
-    # Separate into chunks in order to process in parallel
-    files_chunks = list(chunks(files, 1))
-
-    pool = Pool()
-    loaded_files = pool.starmap(_load_midi_files,
-                                zip(files_chunks, [copy.copy(flags) for _ in range(0, len(files_chunks))]))
-
-    return flatten(loaded_files)
 
 
 def _augment_bar(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:

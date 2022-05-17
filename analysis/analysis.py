@@ -1,9 +1,11 @@
 import math
 
 import numpy as np
+import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from src.config.settings import ROOT_PATH, DIFFICULTY_VALUE_SCALE
+from src.network.generator import TemperatureSchedule
 from src.preprocessing.data_pipeline import load_stored_bars
 
 
@@ -67,4 +69,20 @@ def length_diagram(lengths):
 
     plt.tight_layout()
 
+    plt.show()
+
+
+def test_temperature_rate():
+    temp = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
+
+    plt.plot(temp(tf.range(100, dtype=tf.float32)), color="black")
+
+    plt.xticks([0, 24, 48, 72, 96, 120])
+
+    plt.xlim([0, 100])
+    plt.ylim([0, 1])
+
+    plt.xlabel("Length of Sequence in Ticks", fontsize=16, labelpad=15)
+    plt.ylabel("Temperature", fontsize=16, labelpad=15)
+    plt.tight_layout()
     plt.show()

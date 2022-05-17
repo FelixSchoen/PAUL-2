@@ -7,6 +7,7 @@ from src.config.settings import D_TYPE, START_TOKEN, SEQUENCE_MAX_LENGTH, STOP_T
     SETTINGS_ACMP_TRANSFORMER, VALID_TIME_SIGNATURES
 from src.preprocessing.data_pipeline import Tokenizer, Detokenizer
 from src.util.enumerations import NetworkType
+from src.util.logging import get_logger
 
 
 class Generator(tf.Module):
@@ -17,8 +18,10 @@ class Generator(tf.Module):
         self.network_type = network_type
         self.lead_sequence = lead_sequence
 
-    @tf.function
-    def new_call(self, start_sequence, difficulty, temperature=0, bars=4):
+    # @tf.function
+    def __call__(self, input_sequence, difficulty, temperature, bars=4):
+        logger = get_logger(__name__)
+
         assert not (self.network_type == NetworkType.acmp and self.lead_sequence is None)
 
         # Initialise objects
@@ -28,7 +31,7 @@ class Generator(tf.Module):
         settings = SETTINGS_LEAD_TRANSFORMER if self.network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
 
         # Add start sequence to output sequence
-        output_sequence.merge([start_sequence])
+        output_sequence.merge([input_sequence])
 
         # Build difficulty tensor
         dif_value = tokenizer.tokenize_difficulty((difficulty - 1) / 10)
@@ -45,7 +48,8 @@ class Generator(tf.Module):
             lead_tensor = tf.expand_dims(lead_tensor_array.stack(), 0)
 
         # Build output tensor
-        output_tensor_array, len_input_seq = Generator._create_tensor_from_sequence(start_sequence,
+        output_tensor_array, len_input_seq = Generator._create_tensor_from_sequence(input_sequence,
+                                                                                    size=SEQUENCE_MAX_LENGTH - 1,
                                                                                     write_stop_token=False)
 
         # Create input tensors
@@ -55,6 +59,11 @@ class Generator(tf.Module):
             input_tensors = [lead_tensor, dif_tensor]
         else:
             raise NotImplementedError
+
+        logger.info("Starting generation process")
+
+        # TODO Remove
+        time_tracker = 0
 
         # Loop for up to remaining tokens time
         for i in tf.range(1 + len_input_seq, SEQUENCE_MAX_LENGTH - 1):
@@ -72,26 +81,36 @@ class Generator(tf.Module):
             mask = tf.where(tf.math.is_nan(mask), tf.zeros_like(mask), mask)
             prediction_tensor += mask
 
+            if not callable(temperature):
+                temperature_function = lambda _: temperature
+            else:
+                temperature_function = temperature
+
             # Determine prediction
-            if temperature == 0:
+            if temperature_function(time_tracker) == 0:
                 prediction = tf.argmax(prediction_tensor, axis=-1)[0]
             else:
-                prediction = tf.random.categorical(prediction_tensor / temperature, 1)[0][0]
+                prediction = tf.random.categorical(prediction_tensor / temperature_function(time_tracker), 1)[0][0]
+
+            prediction = tf.cast(prediction, dtype=D_TYPE)
 
             # Write prediction to output tensor
             output_tensor_array.write(i + 1, prediction)
 
             # Check if end of sequence was predicted
-            if prediction == STOP_TOKEN:
+            if prediction.numpy() == STOP_TOKEN:
                 break
 
             # Add to sequence
-            detokens = detokenizer.detokenize(prediction)
+            detokens = detokenizer.detokenize(prediction.numpy())
             detokens.extend(detokenizer.flush_wait_buffer())
             for detoken in detokens:
-                output_sequence.add_relative_message(Message.from_dict(detoken))
+                msg = Message.from_dict(detoken)
+                output_sequence.add_relative_message(msg)
 
-            break
+                if msg.message_type == MessageType.wait:
+                    time_tracker += msg.time
+                    logger.info(f"Currently at {time_tracker} ticks")
 
         # Calculate attention
         output_tensor = tf.expand_dims(output_tensor_array.stack(), 0)
@@ -100,12 +119,12 @@ class Generator(tf.Module):
         return output_sequence, attention_weights
 
     @staticmethod
-    def _create_tensor_from_sequence(sequence, write_stop_token=False):
+    def _create_tensor_from_sequence(sequence, size=SEQUENCE_MAX_LENGTH, write_stop_token=False):
         tokenizer = Tokenizer()
         end_index = 0
 
         data_frame = sequence.to_relative_dataframe()
-        tensor_array = tf.TensorArray(D_TYPE, size=SEQUENCE_MAX_LENGTH, dynamic_size=False)
+        tensor_array = tf.TensorArray(D_TYPE, size=size, dynamic_size=False)
         tensor_array = tensor_array.write(0, START_TOKEN)
         tokens = []
         for _, row in data_frame.iterrows():
@@ -127,10 +146,12 @@ class Generator(tf.Module):
     def _create_mask_from_valid_messages(valid_messages, mask_length):
         tokenizer = Tokenizer()
 
+        # Initialise mask
         mask = [1 for _ in range(mask_length)]
         messages = []
         tokens = []
 
+        # Handle messages that represent multiple valid outcomes (e.g., wait)
         for msg in valid_messages:
             if msg["message_type"] == MessageType.wait.value:
                 # Append all types of messages
@@ -143,12 +164,41 @@ class Generator(tf.Module):
             else:
                 tokens.extend(tokenizer.tokenize(msg))
 
+        # Tokenize messages
         for message in messages:
             tokens.extend(tokenizer.tokenize(message))
             tokens.extend(tokenizer.flush_wait_buffer())
 
+        # Allow tokens
         for token in tokens:
             if token < len(mask):
                 mask[token] = 0
 
+        # Check if no more valid messages
+        if len(tokens) == 0:
+            mask[STOP_TOKEN] = 0
+
         return tf.convert_to_tensor(mask, dtype=tf.dtypes.float32)
+
+
+class TemperatureSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+
+    def __init__(self, max_time, warmup_steps, warmup_multiplier, exponent, max_value, min_value) -> None:
+        super(TemperatureSchedule, self).__init__()
+
+        self.a = max_time
+        self.warmup_steps = warmup_steps
+        self.warmup_multiplier = warmup_multiplier
+        self.n = exponent
+        self.b = max_value
+        self.c = min_value
+
+    def __call__(self, step):
+        i_r = tf.math.divide(tf.math.subtract(1, tf.math.pow(tf.math.divide(step, self.a), self.n)), self.b)
+        i_r = tf.math.maximum(0, i_r)
+
+        warmup_value = ((1 / self.b) * self.warmup_multiplier)
+        step_size = warmup_value / self.warmup_steps
+        i_r_w = warmup_value + step_size * step
+
+        return tf.cast(tf.math.maximum(tf.math.minimum(i_r, i_r_w), self.c), dtype=tf.dtypes.float32)

@@ -5,14 +5,15 @@ from datetime import datetime
 
 import tensorflow as tf
 from sCoda import Sequence, Message
+from sCoda.util.midi_wrapper import MidiFile
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER
+    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, PATH_MIDI
 from src.network.attention import AttentionType
-from src.network.generator import Generator
+from src.network.generator import Generator, TemperatureSchedule
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
@@ -266,9 +267,20 @@ def generate(network_type, model_identifier, difficulty):
 
     # Create starting sequence
     seq = Sequence()
-    seq.add_relative_message(Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
+    if network_type == NetworkType.lead:
+        seq.add_relative_message(Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
 
-    generator.new_call(start_sequence=seq, difficulty=difficulty, temperature=0)
+    schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
+
+    sequence, attention_weights = generator(input_sequence=seq, difficulty=difficulty, temperature=1.5)
+
+    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
+
+    midi_track = sequence.to_midi_track()
+    midi_file = MidiFile()
+    midi_file.tracks.append(midi_track)
+    midi_file.save(output_path)
 
 
 def store_checkpoint(network_type, run_identifier, checkpoint_identifier):

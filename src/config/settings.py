@@ -18,8 +18,10 @@ DATA_BARS_VAL_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/bars/val"
 DATA_TRAIN_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data_train.tfrecords"
 DATA_VAL_OUTPUT_FILE_PATH = ROOT_PATH + "/out/dataset/data_val.tfrecords"
 
-PATH_SAVED_MODEL = ROOT_PATH + "/out/badura/saved_model"
-PATH_CHECKPOINT = ROOT_PATH + "/out/badura/checkpoint"
+PATH_OUT_PAUL = "/out/badura"
+PATH_SAVED_MODEL = ROOT_PATH + PATH_OUT_PAUL + "/saved_model"
+PATH_CHECKPOINT = ROOT_PATH + PATH_OUT_PAUL + "/checkpoint"
+PATH_MIDI = ROOT_PATH + PATH_OUT_PAUL + "/gen"
 PATH_TENSORBOARD = ROOT_PATH + "/out/tensorboard"
 
 # Length of tensors representing sequences
@@ -46,7 +48,7 @@ STOP_TOKEN = 2
 # === Parameters ===
 # ==================
 
-TRAIN_VAL_SPLIT = 0.95
+TRAIN_VAL_SPLIT = 0.9
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
