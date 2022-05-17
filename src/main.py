@@ -1,9 +1,9 @@
 import argparse
 
 from src.config.settings import DATA_MIDI_INPUT_PATH, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH_SPARSE
 from src.network.badura import train_network, generate, store_checkpoint
-from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
+from src.preprocessing.data_pipeline import load_and_store_records, load_midi
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 
@@ -23,7 +23,8 @@ def main():
             logger.info("Skipping loading of MIDI files...")
         else:
             logger.info("Loading MIDI files...")
-            load_midi_files(DATA_MIDI_INPUT_PATH)
+            load_midi(DATA_MIDI_INPUT_PATH_SPARSE) #TODO
+            return
 
         logger.info("Storing TFRecords...")
         load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH)

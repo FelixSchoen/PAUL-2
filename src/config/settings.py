@@ -9,6 +9,7 @@ ROOT_PATH = get_project_root()
 
 # Where to load raw MIDI files from
 DATA_MIDI_INPUT_PATH = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/data"
+DATA_MIDI_INPUT_PATH_SPARSE = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data"
 
 # Where to store processed bars for quicker loading
 DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH = ROOT_PATH + "/out/bars/train"

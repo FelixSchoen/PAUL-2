@@ -8,19 +8,23 @@ from multiprocessing import Pool
 import mido
 import numpy as np
 import tensorflow as tf
-from sCoda import Composition, Bar
+from sCoda import Composition, Bar, Sequence
 from sCoda.elements.message import MessageType
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
     DATA_TRAIN_OUTPUT_FILE_PATH, START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
 from src.util.util import chunks, flatten, file_exists, pickle_save, pickle_load
 
 
-def load_midi_files(directory: str, flags=None) -> list:
+# =================
+# === Load MIDI ===
+# =================
+
+def load_midi(directory: str, flags=None) -> None:
     """ Loads the MIDI files from the drive, processes them, and stores the processed files.
 
     Applies a train / validation split according to the percentage given in the settings, and stores the processed bars
@@ -33,25 +37,188 @@ def load_midi_files(directory: str, flags=None) -> list:
     Returns: The loaded files
 
     """
+    logger = get_logger(__name__)
+
     if flags is None:
         flags = []
 
-    files = []
+    file_paths = []
 
     # Handle all MIDI files in the given directory and subdirectories
     for dir_path, _, filenames in os.walk(directory):
         for filename in [f for f in filenames if f.endswith(".mid")]:
-            files.append((os.path.join(dir_path, filename), filename))
-
-    # Separate into chunks in order to process in parallel
-    files_chunks = list(chunks(files, 1))
+            file_paths.append(os.path.join(dir_path, filename))
 
     pool = Pool()
-    loaded_files = pool.starmap(_load_midi_files,
-                                zip(files_chunks, [copy.copy(flags) for _ in range(0, len(files_chunks))]))
 
-    return flatten(loaded_files)
+    logger.info("Loading compositions...")
+    compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_stretch, zip(file_paths))))
 
+    logger.info("Loading bars...")
+    bars = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
+
+    logger.info("Calculating difficulty...")
+    list(pool.starmap(_load_midi_calculate_difficulty, zip(bars)))
+
+    # Shuffle bars
+    random.Random(SHUFFLE_SEED).shuffle(bars)
+
+    # Split into train and val data
+    split_point = int((len(bars) + 1) * TRAIN_VAL_SPLIT)
+    train_bars = bars[:split_point]
+    val_bars = bars[split_point:]
+
+    logger.info("Transposing bars...")
+    train_bars_trans = flatten(list(map(_augment_bar, train_bars)))
+    val_bars_trans = flatten(list(map(_augment_bar, val_bars)))
+
+    logger.info("Storing bars...")
+    train_zip_file_path = (DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH + "/train.zip")
+    val_zip_file_path = (DATA_BARS_VAL_OUTPUT_FOLDER_PATH + "/val.zip")
+    pickle_save(train_bars_trans, train_zip_file_path)
+    pickle_save(val_bars_trans, val_zip_file_path)
+
+
+def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
+    """ Loads the MIDI file stored at the file path, stretches it, and returns a list of compositions.
+
+    Args:
+        file_path: File path of the MIDI file
+
+    Returns: A list of stretched compositions
+
+    """
+    lead_tracks = []
+    acmp_tracks = []
+    meta_tracks = [0]
+
+    # Open MIDI file
+    midi_file = mido.MidiFile(file_path)
+
+    # Parse track titles
+    for t, track in enumerate(midi_file.tracks):
+        if _find_word("right", track.name) is not None:
+            lead_tracks.append(t)
+        elif _find_word("left", track.name) is not None:
+            acmp_tracks.append(t)
+        elif _find_word("pedal", track.name) is not None:
+            meta_tracks.append(t)
+
+    compositions = []
+    stretch_factors = [0.5, 1, 2]
+
+    # Load sequences from file
+    sequences = Sequence.sequences_from_midi_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
+
+    # Stretch sequences by given factors
+    for stretch_factor in stretch_factors:
+        stretched_sequences = []
+
+        for sequence in sequences:
+            stretched_sequence = copy.copy(sequence)
+            stretched_sequence.stretch(stretch_factor)
+            stretched_sequence.quantise_note_lengths()
+            stretched_sequences.append(stretched_sequence)
+
+        # Create composition from stretched sequences
+        compositions.append(Composition.from_sequences(stretched_sequences))
+
+    return compositions
+
+
+def _load_midi_extract_bars(composition) -> [([Bar], [Bar])]:
+    lead_track = composition.tracks[0]
+    acmp_track = composition.tracks[1]
+
+    # Check that we start with the same number of bars
+    assert len(lead_track.bars) == len(acmp_track.bars)
+
+    # Chunk the bars
+    lead_chunked = []
+    acmp_chunked = []
+
+    lead_current = []
+    acmp_current = []
+
+    remaining = CONSECUTIVE_BAR_MAX_LENGTH
+    for lead_bar, acmp_bar in zip(lead_track.bars, acmp_track.bars):
+        # Check if time signature of bar is valid
+        signature = (int(lead_bar._time_signature_numerator), int(lead_bar._time_signature_denominator))
+
+        # Split at non-valid time signature
+        if signature not in VALID_TIME_SIGNATURES:
+            remaining = CONSECUTIVE_BAR_MAX_LENGTH
+
+            if len(lead_current) > 0:
+                lead_chunked.append(lead_current)
+                acmp_chunked.append(acmp_current)
+
+            lead_current = []
+            acmp_current = []
+
+            continue
+
+        lead_current.append(lead_bar)
+        acmp_current.append(acmp_bar)
+        remaining -= 1
+
+        # Maximum length reached
+        if remaining == 0:
+            remaining = CONSECUTIVE_BAR_MAX_LENGTH
+
+            lead_chunked.append(lead_current)
+            acmp_chunked.append(acmp_current)
+
+            lead_current = []
+            acmp_current = []
+
+    if len(lead_current) > 0:
+        lead_chunked.append(lead_current)
+        acmp_chunked.append(acmp_current)
+
+    # Zip the chunked bars
+    zipped_chunks = list(zip(lead_chunked, acmp_chunked))
+
+    return zipped_chunks
+
+
+def _load_midi_calculate_difficulty(bar_tuple: ([Bar], [Bar])) -> None:
+    for bar in bar_tuple[0]:
+        bar.difficulty()
+    for bar in bar_tuple[1]:
+        bar.difficulty()
+
+    return bar_tuple
+
+
+def _load_midi_transpose_bars(base_bars: ([Bar], [Bar])):
+    augmented_bars = []
+
+    for transpose_by in range(-5, 7):
+        lead_bars = []
+        acmp_bars = []
+
+        # Copy the original bar in order to transpose it later on
+        lead_unedited = [copy.copy(bar) for bar in base_bars[0]]
+        acmp_unedited = [copy.copy(bar) for bar in base_bars[1]]
+
+        # Handle bars at the same time
+        for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
+            lead_bar.difficulty()
+            acmp_bar.difficulty()
+
+            # Append transposed bars to the placeholder objects
+            lead_bars.append(lead_bar)
+            acmp_bars.append(acmp_bar)
+
+        augmented_bars.append((lead_bars, acmp_bars))
+
+    return augmented_bars
+
+
+# ====================
+# === Load Records ===
+# ====================
 
 def load_and_store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH):
     bars = load_stored_bars(directory=input_dir)
@@ -200,6 +367,7 @@ def _bar_tuple_to_token_tuple(bars: ([Bar], [Bar])):
            tf.convert_to_tensor(acmp_seq, dtype=D_TYPE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE)
 
 
+# TODO Delete
 def _extract_bars_from_composition(composition: Composition) -> [([Bar], [Bar])]:
     """ Extracts pairs of up to `CONSECUTIVE_BAR_LENGTH` bars from the given composition.
 
@@ -311,7 +479,7 @@ def _load_midi_files(files, flags: list) -> list:
         logger.info(f"Processing {filename}...")
 
         # Loading the composition from the file
-        composition = _load_composition(filepath)
+        composition = _load_midi_load_composition_and_stretch(filepath)
 
         # Extracting bars that belong together
         extracted_bars = _extract_bars_from_composition(composition)
@@ -342,37 +510,6 @@ def _load_midi_files(files, flags: list) -> list:
         logger.info(f"Finished processing {filename}.")
 
     return processed_files
-
-
-def _load_composition(file_path: str) -> Composition:
-    """ Loads a compositions from a given MIDI file
-
-    Args:
-        file_path: Path to the MIDI file
-
-    Returns: A `Composition` object
-
-    """
-    lead_tracks = []
-    acmp_tracks = []
-    meta_tracks = [0]
-
-    # Open MIDI file
-    midi_file = mido.MidiFile(file_path)
-
-    # Parse track titles
-    for t, track in enumerate(midi_file.tracks):
-        if _find_word("right", track.name) is not None:
-            lead_tracks.append(t)
-        elif _find_word("left", track.name) is not None:
-            acmp_tracks.append(t)
-        elif _find_word("pedal", track.name) is not None:
-            meta_tracks.append(t)
-
-    # Create composition from the found tracks
-    composition = Composition.from_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
-
-    return composition
 
 
 def _load_stored_bars(filepaths_tuple) -> [([Bar], [Bar])]:
