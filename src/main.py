@@ -2,9 +2,9 @@ import argparse
 
 from src.config.settings import DATA_MIDI_INPUT_PATH, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH
-from src.network.badura import train_network, generate
-from src.util.enumerations import NetworkType
+from src.network.badura import train_network, generate, store_checkpoint
 from src.preprocessing.data_pipeline import load_and_store_records, load_midi_files
+from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 
 
@@ -43,6 +43,10 @@ def main():
             train_network(network_type=NetworkType.acmp)
 
             logger.info("Successfully trained acmp network.")
+    elif args.command == "store":
+        network_type = NetworkType.lead if args.network == "lead" else NetworkType.acmp
+        store_checkpoint(network_type=network_type, run_identifier=args.run_identifier,
+                         checkpoint_identifier=int(args.checkpoint_identifier)-1)
     elif args.command == "generate":
         if args.track == "lead":
             logger.info(f"Generating lead track with difficulty {args.difficulty}...")
@@ -67,6 +71,17 @@ def parse_arguments():
     parser_train.set_defaults(command="train")
     parser_train.add_argument("network", choices=["lead", "acmp"],
                               help="Selects which network to train.")
+
+    # Store Command
+    parser_generate = subparsers.add_parser("store", aliases=["s"],
+                                            help="Loads a given checkpoint and stores it as h5 model.")
+    parser_generate.set_defaults(command="store")
+    parser_generate.add_argument("network", choices=["lead", "acmp"],
+                                 help="Selects which network to store.")
+    parser_generate.add_argument("--run_identifier", "-r", required=True,
+                                 help="Determines which run to store.")
+    parser_generate.add_argument("--checkpoint_identifier", "-c", required=True,
+                                 help="Determines which checkpoint to store.")
 
     # Generate Command
     parser_generate = subparsers.add_parser("generate", aliases=["g"],

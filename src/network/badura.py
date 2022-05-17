@@ -98,14 +98,11 @@ def train_network(network_type, start_epoch=0):
     with context:
         # Load settings
         settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
-        num_layers = settings["NUM_LAYERS"]
         d_model = settings["D_MODEL"]
-        num_heads = settings["NUM_HEADS"]
-        dff = settings["DFF"]
         batch_size = settings["BATCH_SIZE"]
 
         logical_gpus = tf.config.list_logical_devices("GPU")
-        logger.info(f"Running with {logical_gpus} virtual GPUs...")
+        logger.info(f"Running with {len(logical_gpus)} virtual GPUs...")
 
         logger.info("Loading dataset...")
         train_ds = load_dataset_from_records(files=[DATA_TRAIN_OUTPUT_FILE_PATH])
@@ -254,7 +251,6 @@ def train_network(network_type, start_epoch=0):
         # Save model
         logger.info("Finished training process. Saving model.")
         transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
-        transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
 
 
 def generate(network_type, model_identifier, difficulty):
@@ -273,6 +269,33 @@ def generate(network_type, model_identifier, difficulty):
     seq.add_relative_message(Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
 
     generator.new_call(start_sequence=seq, difficulty=difficulty, temperature=0)
+
+
+def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
+    logger = get_logger(__name__)
+
+    # Load settings
+    settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
+    d_model = settings["D_MODEL"]
+
+    # Load objects
+    learning_rate = TransformerLearningRateSchedule(d_model)
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
+    transformer, _ = get_network_objects(network_type)
+    transformer.build_model()
+
+    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    # Setup checkpoint
+    checkpoint = tf.train.Checkpoint(transformer=transformer,
+                                     optimizer=optimizer)
+    checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {run_identifier}"
+    checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
+    checkpoint.restore(checkpoint_manager.checkpoints[checkpoint_identifier])
+
+    transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
+
+    logger.info(f"Stored model {current_time} from epoch {checkpoint_identifier}.")
 
 
 def _load_data(network_type, batch):
