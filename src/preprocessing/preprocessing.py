@@ -15,7 +15,7 @@ from sCoda.util.util import get_note_durations, get_tuplet_durations
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
     START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED, PREP_CHUNK_SIZE
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
 from src.util.util import flatten, pickle_save, pickle_load, chunk
@@ -25,7 +25,7 @@ from src.util.util import flatten, pickle_save, pickle_load, chunk
 # === Load MIDI ===
 # =================
 
-def load_midi(directory: str, flags=None) -> None:
+def load_midi(directory: str) -> None:
     """ Loads the MIDI files from the drive, processes them, and stores the processed files.
 
     Applies a train / validation split according to the percentage given in the settings, and stores the processed bars
@@ -33,15 +33,11 @@ def load_midi(directory: str, flags=None) -> None:
 
     Args:
         directory: The directory to load the files from
-        flags: A list of flags for the processing of files
 
     Returns: The loaded files
 
     """
     logger = get_logger(__name__)
-
-    if flags is None:
-        flags = []
 
     file_paths = []
 
@@ -70,8 +66,10 @@ def load_midi(directory: str, flags=None) -> None:
     val_bars = bars[split_point:]
 
     logger.info("Transposing bars...")
-    train_bars_trans = flatten(list(pool.starmap(_load_midi_transpose_bars, zip(chunk(train_bars, PREP_CHUNK_SIZE)))))
-    val_bars_trans = flatten(list(pool.starmap(_load_midi_transpose_bars, zip(chunk(val_bars, PREP_CHUNK_SIZE)))))
+    train_bars_trans = flatten(
+        list(pool.starmap(_load_midi_transpose_bars, zip(chunk(train_bars, int(len(train_bars) / 16))))))
+    val_bars_trans = flatten(
+        list(pool.starmap(_load_midi_transpose_bars, zip(chunk(val_bars, int(len(val_bars) / 16))))))
 
     logger.info("Storing bars...")
     train_zip_file_path = (DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH + "/train.zip")

@@ -23,9 +23,7 @@ def main():
             logger.info("Skipping loading of MIDI files...")
         else:
             logger.info("Loading MIDI files...")
-            load_midi(f"{DATA_MIDI_INPUT_PATH_SPARSE}")
-
-            return
+            load_midi(f"{DATA_MIDI_INPUT_PATH}")
 
         logger.info("Storing TFRecords...")
         store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH)
