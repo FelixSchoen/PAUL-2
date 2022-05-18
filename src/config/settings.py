@@ -25,6 +25,9 @@ PATH_CHECKPOINT = ROOT_PATH + PATH_OUT_PAUL + "/checkpoint"
 PATH_MIDI = ROOT_PATH + PATH_OUT_PAUL + "/gen"
 PATH_TENSORBOARD = ROOT_PATH + "/out/tensorboard"
 
+# How large a chunk of 4 bars should be
+PREP_CHUNK_SIZE = 128
+
 # Length of tensors representing sequences
 SEQUENCE_MAX_LENGTH = 512
 # How many adjacent bars to consolidate into a tensor
