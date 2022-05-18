@@ -10,14 +10,15 @@ import numpy as np
 import tensorflow as tf
 from sCoda import Composition, Bar, Sequence
 from sCoda.elements.message import MessageType
+from sCoda.util.util import get_note_durations, get_tuplet_durations
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
     START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED, PREP_CHUNK_SIZE
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
-from src.util.util import flatten, pickle_save, pickle_load
+from src.util.util import flatten, pickle_save, pickle_load, chunk
 
 
 # =================
@@ -58,7 +59,7 @@ def load_midi(directory: str, flags=None) -> None:
     bars = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
 
     logger.info("Calculating difficulty...")
-    list(pool.starmap(_load_midi_calculate_difficulty, zip(bars)))
+    bars = list(pool.starmap(_load_midi_calculate_difficulty, zip(bars)))
 
     # Shuffle bars
     random.Random(SHUFFLE_SEED).shuffle(bars)
@@ -69,8 +70,8 @@ def load_midi(directory: str, flags=None) -> None:
     val_bars = bars[split_point:]
 
     logger.info("Transposing bars...")
-    train_bars_trans = flatten(list(map(_load_midi_transpose_bars, train_bars)))
-    val_bars_trans = flatten(list(map(_load_midi_transpose_bars, val_bars)))
+    train_bars_trans = flatten(list(pool.starmap(_load_midi_transpose_bars, zip(chunk(train_bars, PREP_CHUNK_SIZE)))))
+    val_bars_trans = flatten(list(pool.starmap(_load_midi_transpose_bars, zip(chunk(val_bars, PREP_CHUNK_SIZE)))))
 
     logger.info("Storing bars...")
     train_zip_file_path = (DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH + "/train.zip")
@@ -110,14 +111,25 @@ def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
     # Load sequences from file
     sequences = Sequence.sequences_from_midi_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
 
+    # Construct quantisation parameters
+    quantise_parameters = get_note_durations(1, 8)
+    quantise_parameters += get_tuplet_durations(quantise_parameters, 3, 2)
+
     # Stretch sequences by given factors
     for stretch_factor in stretch_factors:
         stretched_sequences = []
 
         for sequence in sequences:
             stretched_sequence = copy.copy(sequence)
-            stretched_sequence.stretch(stretch_factor)
+
+            stretched_sequence.quantise(quantise_parameters)
             stretched_sequence.quantise_note_lengths()
+
+            stretched_sequence.stretch(stretch_factor)
+
+            stretched_sequence.quantise(quantise_parameters)
+            stretched_sequence.quantise_note_lengths()
+
             stretched_sequences.append(stretched_sequence)
 
         # Create composition from stretched sequences
@@ -185,33 +197,43 @@ def _load_midi_extract_bars(composition) -> [([Bar], [Bar])]:
 def _load_midi_calculate_difficulty(bar_tuple: ([Bar], [Bar])) -> None:
     for bar in bar_tuple[0]:
         bar.difficulty()
+        assert bar._sequence._difficulty is not None
     for bar in bar_tuple[1]:
         bar.difficulty()
+        assert bar._sequence._difficulty is not None
 
     return bar_tuple
 
 
-def _load_midi_transpose_bars(base_bars: ([Bar], [Bar])):
+def _load_midi_transpose_bars(base_bars_list: [([Bar], [Bar])]):
     transposed_bars = []
 
-    for transpose_by in range(-5, 7):
-        lead_bars = []
-        acmp_bars = []
+    for base_bars in base_bars_list:
+        for transpose_by in range(-5, 7):
+            lead_bars = []
+            acmp_bars = []
 
-        # Copy the original bar in order to transpose it later on
-        lead_unedited = [copy.copy(bar) for bar in base_bars[0]]
-        acmp_unedited = [copy.copy(bar) for bar in base_bars[1]]
+            # Copy the original bar in order to transpose it later on
+            lead_unedited = [bar.__copy__() for bar in base_bars[0]]
+            acmp_unedited = [bar.__copy__() for bar in base_bars[1]]
 
-        # Handle bars at the same time
-        for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
-            lead_bar.difficulty()
-            acmp_bar.difficulty()
+            for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
+                assert lead_bar._sequence._difficulty is not None
+                assert acmp_bar._sequence._difficulty is not None
 
-            # Append transposed bars to the placeholder objects
-            lead_bars.append(lead_bar)
-            acmp_bars.append(acmp_bar)
+                # Transpose bars
+                lead_bar.transpose(transpose_by)
+                acmp_bar.transpose(transpose_by)
 
-        transposed_bars.append((lead_bars, acmp_bars))
+                # Recalculate difficulty, key or pattern could have changed
+                lead_bar.difficulty()
+                acmp_bar.difficulty()
+
+                # Append transposed bars to the placeholder objects
+                lead_bars.append(lead_bar)
+                acmp_bars.append(acmp_bar)
+
+            transposed_bars.append((lead_bars, acmp_bars))
 
     return transposed_bars
 

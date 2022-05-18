@@ -4,7 +4,7 @@ import random
 from pathlib import Path
 
 
-def chunks(lst, n):
+def chunk(lst, n):
     """ Yields chunks of size `n`
 
     Args:

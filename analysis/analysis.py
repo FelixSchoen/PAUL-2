@@ -1,17 +1,24 @@
 import math
+import os
 
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.config.settings import ROOT_PATH, DIFFICULTY_VALUE_SCALE
+from src.config.settings import ROOT_PATH, DIFFICULTY_VALUE_SCALE, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH
 from src.network.generator import TemperatureSchedule
-from src.preprocessing.preprocessing import _load_bars_from_zip
+from src.util.util import pickle_load
 
 
 def test_analysis():
-    # bars = load_stored_bars(directory=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH)
-    bars = _load_bars_from_zip(directory=ROOT_PATH + "/out/bars/misc")
+    def _load_bars(input_dir):
+        bars = []
+        for dir_path, _, filenames in os.walk(input_dir):
+            for filename in [f for f in filenames if f.endswith(".zip")]:
+                bars.extend(pickle_load((os.path.join(dir_path, filename))))
+        return bars
+
+    bars = _load_bars(DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH)
 
     lead_difs = []
     acmp_difs = []
