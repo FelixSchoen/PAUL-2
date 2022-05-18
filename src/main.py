@@ -1,7 +1,7 @@
 import argparse
 
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_MIDI_INPUT_PATH_SPARSE
+    DATA_MIDI_INPUT_PATH_SPARSE, DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
 from src.network.paul import train_network, generate, store_checkpoint
 from src.preprocessing.preprocessing import store_records, load_midi
 from src.util.enumerations import NetworkType
@@ -23,11 +23,11 @@ def main():
             logger.info("Skipping loading of MIDI files...")
         else:
             logger.info("Loading MIDI files...")
-            load_midi(DATA_MIDI_INPUT_PATH_SPARSE)  # TODO
+            load_midi(f"{DATA_MIDI_INPUT_PATH}")
 
         logger.info("Storing TFRecords...")
         store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_path=DATA_TRAIN_OUTPUT_FILE_PATH)
-        # store_records(input_dir=DATA_BARS_VAL_OUTPUT_FOLDER_PATH, output_path=DATA_VAL_OUTPUT_FILE_PATH)
+        store_records(input_dir=DATA_BARS_VAL_OUTPUT_FOLDER_PATH, output_path=DATA_VAL_OUTPUT_FILE_PATH)
 
         logger.info("Successfully processed MIDI files.")
     elif args.command == "train":
