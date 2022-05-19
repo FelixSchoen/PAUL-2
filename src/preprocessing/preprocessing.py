@@ -1,9 +1,11 @@
 import copy
+import gc
 import math
 import multiprocessing
 import os.path
 import random
 import re
+from itertools import starmap
 from multiprocessing import Pool
 
 import mido
@@ -307,16 +309,19 @@ def store_records(input_dir: str, output_dir: str) -> None:
             bars = pickle_load(file_path)
 
             logger.info("Converting bars...")
-            tensors = pool.starmap(_store_records_bar_to_tensor, zip(bars))
+            tensors = list(starmap(_store_records_bar_to_tensor, zip(bars)))
 
             logger.info("Filtering bars...")
-            tensors = filter(_store_records_filter_length, tensors)
+            tensors = list(filter(_store_records_filter_length, tensors))
 
             logger.info("Padding bars...")
-            tensors = pool.starmap(_store_records_pad_tensors, zip(tensors))
+            tensors = list(starmap(_store_records_pad_tensors, zip(tensors)))
 
+            logger.info(f"Writing {len(tensors)} examples...")
             for example in pool.starmap(_store_records_serialize_tensors, zip(tensors)):
                 writer.write(example)
+
+            gc.collect()
 
 
 def _store_records_bar_to_tensor(bar_tuple: ([Bar], [Bar])) -> (Tensor, Tensor):
@@ -353,11 +358,12 @@ def _store_records_bar_to_tensor(bar_tuple: ([Bar], [Bar])) -> (Tensor, Tensor):
             seq.extend(tokens)
             dif.extend([tokenizer.tokenize_difficulty(bar.difficulty()) for _ in range(0, len(seq))])
 
-        # Add start and stop messages
-        seq.insert(0, START_TOKEN)
-        dif.insert(0, START_TOKEN)
-        seq.append(STOP_TOKEN)
-        dif.append(STOP_TOKEN)
+        # Add start and stop messages and pad
+        sequences = [seq, dif]
+
+        for sequence in sequences:
+            sequence.insert(0, START_TOKEN)
+            sequence.append(STOP_TOKEN)
 
     return tf.convert_to_tensor(lead_seq, dtype=D_TYPE), tf.convert_to_tensor(lead_dif, dtype=D_TYPE), \
            tf.convert_to_tensor(acmp_seq, dtype=D_TYPE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE)
@@ -388,7 +394,7 @@ def _store_records_pad_tensors(tensors_to_pad: (Tensor, Tensor)) -> [Tensor]:
     padded_tensors = []
 
     for tensor_to_pad in tensors_to_pad:
-        padded_tensors.append(np.pad(tensor_to_pad, (0, SEQUENCE_MAX_LENGTH - tensor_to_pad.shape[0]), "constant"))
+        padded_tensors.append(np.pad(tensor_to_pad, (0, SEQUENCE_MAX_LENGTH - tensor_to_pad.shape[0])))
 
     return padded_tensors
 

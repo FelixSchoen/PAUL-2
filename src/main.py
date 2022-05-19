@@ -25,8 +25,6 @@ def main():
             logger.info("Loading MIDI files...")
             load_midi(f"{DATA_MIDI_INPUT_PATH}")
 
-            return
-
         logger.info("Storing TFRecords...")
         store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_dir=DATA_TRAIN_OUTPUT_FILE_PATH)
         store_records(input_dir=DATA_BARS_VAL_OUTPUT_FOLDER_PATH, output_dir=DATA_VAL_OUTPUT_FILE_PATH)
