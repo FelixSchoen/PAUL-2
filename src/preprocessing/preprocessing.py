@@ -308,8 +308,11 @@ def store_records(input_dir: str, output_dir: str) -> None:
             logger.info(f"Loading {file_name}...")
             bars = pickle_load(file_path)
 
+            logger.info("Tokenizing bars...")
+            tokens = list(pool.starmap(_store_records_bar_to_tensor, zip(bars)))
+
             logger.info("Converting bars...")
-            tensors = list(starmap(_store_records_bar_to_tensor, zip(bars)))
+            tensors = list(starmap(_store_records_convert_to_tensor, tokens))
 
             logger.info("Filtering bars...")
             tensors = list(filter(_store_records_filter_length, tensors))
@@ -324,13 +327,13 @@ def store_records(input_dir: str, output_dir: str) -> None:
             gc.collect()
 
 
-def _store_records_bar_to_tensor(bar_tuple: ([Bar], [Bar])) -> (Tensor, Tensor):
-    """ Converts the bar tuple to a tuple of tensors.
+def _store_records_bar_to_tensor(bar_tuple: ([Bar], [Bar])) -> ([int], [int], [int], [int]):
+    """ Converts the bar tuple to a tuple of tokens.
 
     Args:
         bar_tuple: The bar tuple to convert
 
-    Returns: A tuple of tensors
+    Returns: A tuple of tokens
 
     """
     lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
@@ -365,6 +368,21 @@ def _store_records_bar_to_tensor(bar_tuple: ([Bar], [Bar])) -> (Tensor, Tensor):
             sequence.insert(0, START_TOKEN)
             sequence.append(STOP_TOKEN)
 
+    return lead_seq, lead_dif, acmp_seq, acmp_dif
+
+
+def _store_records_convert_to_tensor(lead_seq, lead_dif, acmp_seq, acmp_dif) -> (Tensor, Tensor, Tensor, Tensor):
+    """ Converts the tokens to tensors
+
+    Args:
+        lead_seq: Lead sequence tokens
+        lead_dif: Lead difficulties tokens
+        acmp_seq: Accompanying sequence token
+        acmp_dif: Accompaying difficulties token
+
+    Returns: A tuple of Tensors
+
+    """
     return tf.convert_to_tensor(lead_seq, dtype=D_TYPE), tf.convert_to_tensor(lead_dif, dtype=D_TYPE), \
            tf.convert_to_tensor(acmp_seq, dtype=D_TYPE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE)
 
