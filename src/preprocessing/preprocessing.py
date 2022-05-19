@@ -1,5 +1,6 @@
 import copy
 import math
+import multiprocessing
 import os.path
 import random
 import re
@@ -11,6 +12,7 @@ import tensorflow as tf
 from sCoda import Composition, Bar, Sequence
 from sCoda.elements.message import MessageType
 from sCoda.util.util import get_note_durations, get_tuplet_durations
+from tensorflow import Tensor
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
@@ -18,23 +20,21 @@ from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH,
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
-from src.util.util import flatten, pickle_save, pickle_load, chunk
+from src.util.util import flatten, pickle_save, pickle_load
 
 
 # =================
 # === Load MIDI ===
 # =================
 
-def load_midi(directory: str) -> None:
+def load_midi(input_dir: str) -> None:
     """ Loads the MIDI files from the drive, processes them, and stores the processed files.
 
     Applies a train / validation split according to the percentage given in the settings, and stores the processed bars
     in different directories regarding their split.
 
     Args:
-        directory: The directory to load the files from
-
-    Returns: The loaded files
+        input_dir: The directory to load the files from
 
     """
     logger = get_logger(__name__)
@@ -42,40 +42,43 @@ def load_midi(directory: str) -> None:
     file_paths = []
 
     # Handle all MIDI files in the given directory and subdirectories
-    for dir_path, _, filenames in os.walk(directory):
-        for filename in [f for f in filenames if f.endswith(".mid")]:
-            file_paths.append(os.path.join(dir_path, filename))
+    for dir_path, _, filenames in os.walk(input_dir):
+        for file_name in [f for f in filenames if f.endswith(".mid")]:
+            file_paths.append((os.path.join(dir_path, file_name), file_name))
 
-    pool = Pool()
+    pool = Pool(multiprocessing.cpu_count() - 1)
 
-    logger.info("Loading compositions...")
-    compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_stretch, zip(file_paths))))
+    for file_tuple in file_paths:
+        file_path, file_name = file_tuple
 
-    logger.info("Loading bars...")
-    bars = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
+        logger.info(f"Loading {file_name}...")
+        compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_stretch, zip([file_path]))))
 
-    logger.info("Calculating difficulty...")
-    bars = list(pool.starmap(_load_midi_calculate_difficulty, zip(bars)))
+        logger.info("Loading bars...")
+        bars = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
 
-    # Shuffle bars
-    random.Random(SHUFFLE_SEED).shuffle(bars)
+        logger.info("Calculating difficulty...")
+        bars = list(pool.starmap(_load_midi_calculate_difficulty, zip(bars)))
 
-    # Split into train and val data
-    split_point = int((len(bars) + 1) * TRAIN_VAL_SPLIT)
-    train_bars = bars[:split_point]
-    val_bars = bars[split_point:]
+        # Shuffle bars
+        random.Random(SHUFFLE_SEED).shuffle(bars)
 
-    logger.info("Transposing bars...")
-    train_bars_trans = flatten(
-        list(pool.starmap(_load_midi_transpose_bars, zip(chunk(train_bars, int(len(train_bars) / 16))))))
-    val_bars_trans = flatten(
-        list(pool.starmap(_load_midi_transpose_bars, zip(chunk(val_bars, int(len(val_bars) / 16))))))
+        # Split into train and val data
+        split_point = int((len(bars) + 1) * TRAIN_VAL_SPLIT)
+        train_bars = bars[:split_point]
+        val_bars = bars[split_point:]
 
-    logger.info("Storing bars...")
-    train_zip_file_path = (DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH + "/train.zip")
-    val_zip_file_path = (DATA_BARS_VAL_OUTPUT_FOLDER_PATH + "/val.zip")
-    pickle_save(train_bars_trans, train_zip_file_path)
-    pickle_save(val_bars_trans, val_zip_file_path)
+        logger.info("Transposing bars...")
+        train_bars_trans = flatten(
+            list(pool.starmap(_load_midi_transpose_bars, zip(train_bars))))
+        val_bars_trans = flatten(
+            list(pool.starmap(_load_midi_transpose_bars, zip(val_bars))))
+
+        logger.info("Storing bars...")
+        train_zip_file_path = f"{DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH}/{file_name}.zip"
+        val_zip_file_path = f"{DATA_BARS_VAL_OUTPUT_FOLDER_PATH}/{file_name}.zip"
+        pickle_save(train_bars_trans, train_zip_file_path)
+        pickle_save(val_bars_trans, val_zip_file_path)
 
 
 def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
@@ -136,7 +139,16 @@ def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
     return compositions
 
 
-def _load_midi_extract_bars(composition) -> [([Bar], [Bar])]:
+def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
+    """ Combines up to `CONSECUTIVE_BAR_MAX_LENGTH` bars of valid time signatures to a tuple of lead and accompanying
+    bars.
+
+    Args:
+        composition: The composition to extract bars from
+
+    Returns: A list of tuples consisting of lead and accompanying bars
+
+    """
     lead_track = composition.tracks[0]
     acmp_track = composition.tracks[1]
 
@@ -192,7 +204,15 @@ def _load_midi_extract_bars(composition) -> [([Bar], [Bar])]:
     return zipped_chunks
 
 
-def _load_midi_calculate_difficulty(bar_tuple: ([Bar], [Bar])) -> None:
+def _load_midi_calculate_difficulty(bar_tuple: ([Bar], [Bar])) -> ([Bar], [Bar]):
+    """ Calculates difficulties for all bars in the given tuple.
+
+    Args:
+        bar_tuple: The bar tuple to calculate the difficulty for
+
+    Returns: The bar tuple with the difficulties applied
+
+    """
     for bar in bar_tuple[0]:
         bar.difficulty()
         assert bar._sequence._difficulty is not None
@@ -203,41 +223,48 @@ def _load_midi_calculate_difficulty(bar_tuple: ([Bar], [Bar])) -> None:
     return bar_tuple
 
 
-def _load_midi_transpose_bars(base_bars_list: [([Bar], [Bar])]):
+def _load_midi_transpose_bars(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
+    """ Transposes the given bars and recalculates difficulty if necessary.
+
+    Args:
+        base_bars: The bar tuple to transpose
+
+    Returns: A list of transposed bars
+
+    """
     transposed_bars = []
 
-    for base_bars in base_bars_list:
-        for transpose_by in range(-5, 7):
-            lead_bars = []
-            acmp_bars = []
+    for transpose_by in range(-5, 7):
+        lead_bars = []
+        acmp_bars = []
 
-            # Copy the original bar in order to transpose it later on
-            lead_unedited = [bar.__copy__() for bar in base_bars[0]]
-            acmp_unedited = [bar.__copy__() for bar in base_bars[1]]
+        # Copy the original bar in order to transpose it later on
+        lead_unedited = [bar.__copy__() for bar in base_bars[0]]
+        acmp_unedited = [bar.__copy__() for bar in base_bars[1]]
 
-            for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
-                assert lead_bar._sequence._difficulty is not None
-                assert acmp_bar._sequence._difficulty is not None
+        for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
+            assert lead_bar._sequence._difficulty is not None
+            assert acmp_bar._sequence._difficulty is not None
 
-                # Transpose bars
-                lead_bar.transpose(transpose_by)
-                acmp_bar.transpose(transpose_by)
+            # Transpose bars
+            lead_bar.transpose(transpose_by)
+            acmp_bar.transpose(transpose_by)
 
-                # Recalculate difficulty, key or pattern could have changed
-                lead_bar.difficulty()
-                acmp_bar.difficulty()
+            # Recalculate difficulty, key or pattern could have changed
+            lead_bar.difficulty()
+            acmp_bar.difficulty()
 
-                # Append transposed bars to the placeholder objects
-                lead_bars.append(lead_bar)
-                acmp_bars.append(acmp_bar)
+            # Append transposed bars to the placeholder objects
+            lead_bars.append(lead_bar)
+            acmp_bars.append(acmp_bar)
 
-            transposed_bars.append((lead_bars, acmp_bars))
+        transposed_bars.append((lead_bars, acmp_bars))
 
     return transposed_bars
 
 
-def _load_midi_find_word(word, sentence) -> re.Match:
-    """ Tries to find a word, not just a sequence of characters, in the given sentence
+def _load_midi_find_word(word: str, sentence: str) -> re.Match:
+    """ Tries to find a word, not just a sequence of characters, in the given sentence.
 
     Args:
         word: The word to look for
@@ -253,39 +280,60 @@ def _load_midi_find_word(word, sentence) -> re.Match:
 # === Store Records ===
 # =====================
 
-def store_records(input_dir, output_path):
+def store_records(input_dir: str, output_dir: str) -> None:
+    """ Loads zipped bars from the drive and stores them one-by-one in a .tfrecord file.
+
+    Args:
+        input_dir: Directory to load the zipped bars from
+        output_dir: Output directory of the .tfrecord files
+
+    """
     logger = get_logger(__name__)
 
-    logger.info("Loading bars...")
-    bars = []
+    file_paths = []
+
     for dir_path, _, filenames in os.walk(input_dir):
-        for filename in [f for f in filenames if f.endswith(".zip")]:
-            bars.extend(pickle_load((os.path.join(dir_path, filename))))
+        for file_name in [f for f in filenames if f.endswith(".zip")]:
+            file_paths.append((os.path.join(dir_path, file_name), file_name))
 
-    logger.info("Converting bars...")
-    data_rows = map(_store_records_bar_to_tensor, bars)
-
-    logger.info("Filtering bars...")
-    data_rows = filter(_store_records_filter_length, data_rows)
-
-    logger.info("Padding bars...")
-    data_rows = map(_store_records_pad_tensors, data_rows)
-
-    logger.info("Writing records...")
     pool = Pool()
     options = tf.io.TFRecordOptions(compression_type="GZIP")
-    with tf.io.TFRecordWriter(output_path, options=options) as writer:
-        for example in pool.map(_store_records_serialize_tensors, list(data_rows)):
-            writer.write(example)
+
+    with tf.io.TFRecordWriter(output_dir, options=options) as writer:
+        for file_tuple in file_paths:
+            file_path, file_name = file_tuple
+
+            logger.info(f"Loading {file_name}...")
+            bars = pickle_load(file_path)
+
+            logger.info("Converting bars...")
+            tensors = pool.starmap(_store_records_bar_to_tensor, zip(bars))
+
+            logger.info("Filtering bars...")
+            tensors = filter(_store_records_filter_length, tensors)
+
+            logger.info("Padding bars...")
+            tensors = pool.starmap(_store_records_pad_tensors, zip(tensors))
+
+            for example in pool.starmap(_store_records_serialize_tensors, zip(tensors)):
+                writer.write(example)
 
 
-def _store_records_bar_to_tensor(bars: ([Bar], [Bar])):
+def _store_records_bar_to_tensor(bar_tuple: ([Bar], [Bar])) -> (Tensor, Tensor):
+    """ Converts the bar tuple to a tuple of tensors.
+
+    Args:
+        bar_tuple: The bar tuple to convert
+
+    Returns: A tuple of tensors
+
+    """
     lead_seq, lead_dif, acmp_seq, acmp_dif = [], [], [], []
 
     for i, (seq, dif) in enumerate([(lead_seq, lead_dif), (acmp_seq, acmp_dif)]):
         tokenizer = Tokenizer(skip_time_signature=(i == 1))
 
-        for bar in bars[i]:
+        for bar in bar_tuple[i]:
             data_frame = bar.to_relative_dataframe()
 
             # Sanity check
@@ -315,27 +363,63 @@ def _store_records_bar_to_tensor(bars: ([Bar], [Bar])):
            tf.convert_to_tensor(acmp_seq, dtype=D_TYPE), tf.convert_to_tensor(acmp_dif, dtype=D_TYPE)
 
 
-def _store_records_filter_length(to_filter):
+def _store_records_filter_length(to_filter: (Tensor, Tensor)) -> bool:
+    """ Filters the given tensor by its length.
+
+    Args:
+        to_filter: The tensor to filter
+
+    Returns: A boolean indicating if the tensor conforms to the criterion
+
+    """
     length = max([tf.shape(x)[0] for x in to_filter])
     return length <= SEQUENCE_MAX_LENGTH - 2  # Leave space for start and stop messages
 
 
-def _store_records_pad_tensors(tensors_to_pad):
-    results = []
+def _store_records_pad_tensors(tensors_to_pad: (Tensor, Tensor)) -> [Tensor]:
+    """ Pads the given tensors to a maximum length of `SEQUENCE_MAX_LENGTH`.
 
-    for ele in tensors_to_pad:
-        results.append(np.pad(ele, (0, SEQUENCE_MAX_LENGTH - ele.shape[0]), "constant"))
+    Args:
+        tensors_to_pad: The tensors to pad
 
-    return results
+    Returns: The padded tensors
+
+    """
+    padded_tensors = []
+
+    for tensor_to_pad in tensors_to_pad:
+        padded_tensors.append(np.pad(tensor_to_pad, (0, SEQUENCE_MAX_LENGTH - tensor_to_pad.shape[0]), "constant"))
+
+    return padded_tensors
 
 
-def _store_records_serialize_tensors(entry):
-    lead_msg, lead_dif, acmp_msg, acmp_dif = entry
-    record = _store_records_tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif)
+def _store_records_serialize_tensors(tensor: Tensor) -> Tensor:
+    """ Serializes the given tensor into a tensor of string type.
+
+    Args:
+        tensor: The tensor to serialize
+
+    Returns: A serialized tensor of string type
+
+    """
+    lead_msg, lead_dif, acmp_msg, acmp_dif = tensor
+    record = _store_records_tensor_to_example(lead_msg, lead_dif, acmp_msg, acmp_dif)
     return record.SerializeToString()
 
 
-def _store_records_tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif):
+def _store_records_tensor_to_example(lead_msg, lead_dif, acmp_msg, acmp_dif) -> tf.train.Example:
+    """ Converts the given tensors to an example.
+
+    Args:
+        lead_msg: Lead messages tensor
+        lead_dif: Lead difficulties tensor
+        acmp_msg: Accompanying messages tensor
+        acmp_dif: Accompanying difficulties tensor
+
+    Returns: Example containing the given tensors
+
+    """
+
     def _int_feature(value):
         return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
 
@@ -353,8 +437,16 @@ def _store_records_tensor_to_record(lead_msg, lead_dif, acmp_msg, acmp_dif):
 # === Load Records ===
 # ====================
 
-def load_records(files):
-    raw_dataset = tf.data.TFRecordDataset(files, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
+def load_records(input_path) -> tf.data.Dataset:
+    """ Loads a dataset from the records stored on drive.
+
+    Args:
+        input_path: File location of the dataset
+
+    Returns: The loaded dataset
+
+    """
+    raw_dataset = tf.data.TFRecordDataset(input_path, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
 
     feature_desc = {
         "lead_msg": tf.io.FixedLenFeature([512], tf.int64),
@@ -427,7 +519,8 @@ class Tokenizer:
 
         return tokens
 
-    def tokenize_difficulty(self, difficulty):
+    @staticmethod
+    def tokenize_difficulty(difficulty):
         shifter = 3
         scaled_difficulty = math.floor(min(DIFFICULTY_VALUE_SCALE - 1, difficulty * DIFFICULTY_VALUE_SCALE))
 

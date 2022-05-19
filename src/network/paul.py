@@ -106,8 +106,8 @@ def train_network(network_type, start_epoch=0):
         logger.info(f"Running with {len(logical_gpus)} virtual GPUs...")
 
         logger.info("Loading dataset...")
-        train_ds = load_records(files=[DATA_TRAIN_OUTPUT_FILE_PATH])
-        val_ds = load_records(files=[DATA_VAL_OUTPUT_FILE_PATH])
+        train_ds = load_records(input_path=[DATA_TRAIN_OUTPUT_FILE_PATH])
+        val_ds = load_records(input_path=[DATA_VAL_OUTPUT_FILE_PATH])
 
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy = AutoShardPolicy.DATA
@@ -214,9 +214,10 @@ def train_network(network_type, start_epoch=0):
 
                 # Logging
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
-                logger.info(
-                    f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
-                    f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
+                if batch_num % 100 == 0:
+                    logger.info(
+                        f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
+                        f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
                 # Reset timer
                 batch_timer = time.time()
