@@ -1,7 +1,10 @@
 import gzip
+import math
 import pickle
 import random
 from pathlib import Path
+
+from src.config.settings import DIFFICULTY_VALUE_SCALE
 
 
 def chunk(lst, n):
@@ -16,6 +19,18 @@ def chunk(lst, n):
     """
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+
+def convert_difficulty(difficulty):
+    """ Converts the given difficulty to the internally used scale.
+
+    Args:
+        difficulty: The difficulty to convert
+
+    Returns: A value conforming to the internal scale
+
+    """
+    return math.floor(min(DIFFICULTY_VALUE_SCALE - 1, difficulty * DIFFICULTY_VALUE_SCALE))
 
 
 def file_exists(filepath):
@@ -36,11 +51,6 @@ def flatten(lst) -> []:
 
 def get_src_root() -> str:
     root_path = Path(__file__).parent.parent
-    return str(root_path)
-
-
-def get_project_root() -> str:
-    root_path = Path(__file__).parent.parent.parent
     return str(root_path)
 
 

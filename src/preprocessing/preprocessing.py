@@ -1,6 +1,5 @@
 import copy
 import gc
-import math
 import multiprocessing
 import os.path
 import random
@@ -18,11 +17,11 @@ from tensorflow import Tensor
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
-    START_TOKEN, STOP_TOKEN, D_TYPE, DIFFICULTY_VALUE_SCALE, TRAIN_VAL_SPLIT, \
+    START_TOKEN, STOP_TOKEN, D_TYPE, TRAIN_VAL_SPLIT, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
-from src.util.util import flatten, pickle_save, pickle_load
+from src.util.util import flatten, pickle_save, pickle_load, convert_difficulty
 
 
 # =================
@@ -53,6 +52,11 @@ def load_midi(input_dir: str) -> None:
     for file_tuple in file_paths:
         file_path, file_name = file_tuple
 
+        if os.path.exists(f"{DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip") and os.path.exists(
+                f"{DATA_BARS_VAL_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip"):
+            logger.info(f"Skipping {file_name}...")
+            continue
+
         logger.info(f"Loading {file_name}...")
         compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_stretch, zip([file_path]))))
 
@@ -77,10 +81,12 @@ def load_midi(input_dir: str) -> None:
             list(pool.starmap(_load_midi_transpose_bars, zip(val_bars))))
 
         logger.info("Storing bars...")
-        train_zip_file_path = f"{DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH}/{file_name}.zip"
-        val_zip_file_path = f"{DATA_BARS_VAL_OUTPUT_FOLDER_PATH}/{file_name}.zip"
+        train_zip_file_path = f"{DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip"
+        val_zip_file_path = f"{DATA_BARS_VAL_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip"
         pickle_save(train_bars_trans, train_zip_file_path)
         pickle_save(val_bars_trans, val_zip_file_path)
+
+        gc.collect()
 
 
 def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
@@ -473,10 +479,10 @@ def load_records(input_path) -> tf.data.Dataset:
     raw_dataset = tf.data.TFRecordDataset(input_path, compression_type="GZIP", num_parallel_reads=tf.data.AUTOTUNE)
 
     feature_desc = {
-        "lead_msg": tf.io.FixedLenFeature([512], tf.int64),
-        "lead_dif": tf.io.FixedLenFeature([512], tf.int64),
-        "acmp_msg": tf.io.FixedLenFeature([512], tf.int64),
-        "acmp_dif": tf.io.FixedLenFeature([512], tf.int64),
+        "lead_msg": tf.io.FixedLenFeature([SEQUENCE_MAX_LENGTH], tf.int64),
+        "lead_dif": tf.io.FixedLenFeature([SEQUENCE_MAX_LENGTH], tf.int64),
+        "acmp_msg": tf.io.FixedLenFeature([SEQUENCE_MAX_LENGTH], tf.int64),
+        "acmp_dif": tf.io.FixedLenFeature([SEQUENCE_MAX_LENGTH], tf.int64),
     }
 
     def _parse_function(example_proto):
@@ -546,7 +552,7 @@ class Tokenizer:
     @staticmethod
     def tokenize_difficulty(difficulty):
         shifter = 3
-        scaled_difficulty = math.floor(min(DIFFICULTY_VALUE_SCALE - 1, difficulty * DIFFICULTY_VALUE_SCALE))
+        scaled_difficulty = convert_difficulty(difficulty)
 
         return shifter + scaled_difficulty
 

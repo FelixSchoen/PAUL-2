@@ -214,14 +214,14 @@ def train_network(network_type, start_epoch=0):
 
                 # Logging
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
-                if batch_num % 100 == 0:
+                if batch_num - 1 % 100 == 0 or batch_num == 0:
                     logger.info(
                         f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
                         f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
-                # Reset timer
-                batch_timer = time.time()
-                tf.config.experimental.reset_memory_stats("GPU:0")
+                    # Reset timer
+                    batch_timer = time.time()
+                    tf.config.experimental.reset_memory_stats("GPU:0")
 
             logger.info(f"[E{epoch + 1:02d}]: Calculating validation statistics...")
 

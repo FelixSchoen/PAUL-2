@@ -1,43 +1,50 @@
-import math
 import os
 
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from src.config.settings import ROOT_PATH, DIFFICULTY_VALUE_SCALE, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH
+from src.config.settings import ROOT_PATH
 from src.network.generator import TemperatureSchedule
-from src.util.util import pickle_load
+from src.util.logging import get_logger
+from src.util.util import pickle_load, convert_difficulty
 
 
 def test_analysis():
-    def _load_bars(input_dir):
-        bars = []
-        for dir_path, _, filenames in os.walk(input_dir):
-            for filename in [f for f in filenames if f.endswith(".zip")]:
-                bars.extend(pickle_load((os.path.join(dir_path, filename))))
-        return bars
-
-    bars = _load_bars(DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH)
+    logger = get_logger(__name__)
 
     lead_difs = []
     acmp_difs = []
     lengths = []
 
-    for bar_tuple in bars:
-        current_length_lead = 0
-        current_length_acmp = 0
-        lead_bars, acmp_bars = bar_tuple
+    file_paths = []
 
-        for bar in lead_bars:
-            lead_difs.append(math.floor(min(DIFFICULTY_VALUE_SCALE - 1, bar.difficulty() * DIFFICULTY_VALUE_SCALE)))
-            current_length_lead += len(bar._sequence._get_rel().messages)
-        for bar in acmp_bars:
-            acmp_difs.append(math.floor(min(DIFFICULTY_VALUE_SCALE - 1, bar.difficulty() * DIFFICULTY_VALUE_SCALE)))
-            current_length_acmp += len(bar._sequence._get_rel().messages)
+    for dir_path, _, filenames in os.walk(f"{ROOT_PATH}/out/bars/train"):
+        for file_name in [f for f in filenames if f.endswith(".zip")]:
+            file_paths.append((os.path.join(dir_path, file_name), file_name))
 
-        lengths.append(current_length_lead)
-        lengths.append(current_length_acmp)
+    for file_tuple in file_paths:
+        file_path, file_name = file_tuple
+
+        logger.info(f"Loading {file_name}...")
+        bars = pickle_load(file_path)
+
+        for bar_tuple in bars:
+            current_length_lead = 0
+            current_length_acmp = 0
+            lead_bars, acmp_bars = bar_tuple
+
+            for bar in lead_bars:
+                lead_difs.append(
+                    convert_difficulty(bar.difficulty()) + 1)
+                current_length_lead += len(bar._sequence._get_rel().messages)
+            for bar in acmp_bars:
+                acmp_difs.append(
+                    convert_difficulty(bar.difficulty()) + 1)
+                current_length_acmp += len(bar._sequence._get_rel().messages)
+
+            lengths.append(current_length_lead)
+            lengths.append(current_length_acmp)
 
     combined_difs = []
     combined_difs.extend(lead_difs)
@@ -49,8 +56,37 @@ def test_analysis():
     length_diagram(lengths)
 
 
+def test_save_sample_bars():
+    logger = get_logger(__name__)
+
+    file_paths = []
+
+    for dir_path, _, filenames in os.walk(f"{ROOT_PATH}/out/bars/train"):
+        for file_name in [f for f in filenames if f.endswith(".zip")]:
+            file_paths.append((os.path.join(dir_path, file_name), file_name))
+
+    for file_tuple in file_paths:
+        file_path, file_name = file_tuple
+
+        logger.info(f"Loading {file_name}...")
+        bars = pickle_load(file_path)
+
+        path = f"{ROOT_PATH}/out/bars/analysis_difficulty"
+
+        for bar_tuple in bars:
+            lead_bars, acmp_bars = bar_tuple
+
+            for bar_list in [lead_bars, acmp_bars]:
+                for bar in bar_list:
+                    file_path = f"{path}/{convert_difficulty(bar.difficulty())+1}_{file_name[:-4]}.mid"
+
+                    if os.path.exists(file_path):
+                        continue
+                    bar._sequence.save(file_path)
+
+
 def difficulty_diagram(difficulties):
-    plt.hist(difficulties, bins=np.arange(10) - 0.5, color="black")
+    plt.hist(difficulties, bins=np.arange(12) - 0.5, color="black")
 
     plt.xlabel("Difficulty Class", fontsize=16, labelpad=15)
     plt.ylabel("Amount Bars", fontsize=16, labelpad=15)
@@ -64,7 +100,7 @@ def difficulty_diagram(difficulties):
 
 
 def length_diagram(lengths):
-    plt.hist(lengths, np.linspace(0, 512, 513), color="black")
+    plt.hist(lengths, np.linspace(0, 512, 128), color="black")
     plt.xlim([0, 512])
     plt.ylim(plt.ylim())
 
