@@ -2,16 +2,16 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime
+from operator import itemgetter
 
 import tensorflow as tf
 from sCoda import Sequence, Message
-from sCoda.util.midi_wrapper import MidiFile
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, PATH_MIDI
+    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, DIFFICULTY_VALUE_SCALE
 from src.network.attention import AttentionType
 from src.network.generator import Generator, TemperatureSchedule
 from src.network.masking import MaskType
@@ -21,7 +21,7 @@ from src.network.transformer import Transformer
 from src.preprocessing.preprocessing import load_records
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
-from src.util.util import get_src_root
+from src.util.util import get_src_root, convert_difficulty
 
 
 def get_strategy():
@@ -84,7 +84,7 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
     return transformer, trainer
 
 
-def train_network(network_type, start_epoch=0):
+def train_network(network_type, start_epoch=0, run_identifier=None):
     logger = get_logger(__name__)
 
     strategy = get_strategy()
@@ -145,13 +145,16 @@ def train_network(network_type, start_epoch=0):
         # For restarting at a later epoch
         start_epoch = tf.Variable(start_epoch)
 
+        # Setup time and run identifier
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+        if run_identifier is None:
+            run_identifier = current_time
 
         # Set checkpoint
         checkpoint = tf.train.Checkpoint(transformer=transformer,
                                          optimizer=optimizer,
                                          epoch=start_epoch)
-        checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {current_time}"
+        checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {run_identifier}"
         checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
 
         # If checkpoint exists, restore it
@@ -160,12 +163,12 @@ def train_network(network_type, start_epoch=0):
             logger.info(
                 f"Restored checkpoint, will start from epoch {start_epoch.numpy() + 1}, {optimizer.iterations.numpy()} "
                 f"iterations already completed.")
+            log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}"
+        else:
+            log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}"
 
         # Tensorboard setup
-        train_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{current_time}/train"
-        val_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{current_time}/val"
-        train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-        val_summary_writer = tf.summary.create_file_writer(val_log_dir)
+        summary_writer = tf.summary.create_file_writer(log_dir)
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), EPOCHS):
@@ -208,7 +211,7 @@ def train_network(network_type, start_epoch=0):
                     trainer.train_step(inputs, target)
 
                 # Tensorboard
-                with train_summary_writer.as_default():
+                with summary_writer.as_default():
                     tf.summary.scalar("train_loss", train_loss.result(), step=optimizer.iterations)
                     tf.summary.scalar("train_accuracy", train_accuracy.result(), step=optimizer.iterations)
 
@@ -216,7 +219,7 @@ def train_network(network_type, start_epoch=0):
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
                 if batch_num - 1 % 100 == 0 or batch_num == 0:
                     logger.info(
-                        f"[E{epoch + 1:02d}B{batch_num + 1:04d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
+                        f"[E{epoch + 1:02d}B{batch_num + 1:05d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
                         f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
                     # Reset timer
@@ -237,7 +240,7 @@ def train_network(network_type, start_epoch=0):
                     trainer.val_step(inputs, target)
 
             # Tensorboard
-            with val_summary_writer.as_default():
+            with summary_writer.as_default():
                 tf.summary.scalar("val_loss", val_loss.result(), step=epoch)
                 tf.summary.scalar("val_accuracy", val_accuracy.result(), step=epoch)
 
@@ -252,7 +255,7 @@ def train_network(network_type, start_epoch=0):
 
         # Save model
         logger.info("Finished training process. Saving model.")
-        transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
+        transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{run_identifier}.h5")
 
 
 def generate(network_type, model_identifier, difficulty):
@@ -269,19 +272,39 @@ def generate(network_type, model_identifier, difficulty):
     # Create starting sequence
     seq = Sequence()
     if network_type == NetworkType.lead:
-        seq.add_relative_message(Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
+        seq.add_relative_message(
+            Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
 
     schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
 
-    sequence, attention_weights = generator(input_sequence=seq, difficulty=difficulty, temperature=1.5)
+    sequences, attention_weights = generator(input_sequence=seq, difficulty=difficulty, temperature=1.5)
 
-    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
+    deviations = []
+    # Calculate difficulty deviations
+    for i, sequence in enumerate(sequences):
+        desired_difficulty = difficulty
+        if desired_difficulty == DIFFICULTY_VALUE_SCALE - 1:
+            desired_difficulty = DIFFICULTY_VALUE_SCALE
 
-    midi_track = sequence.to_midi_track()
-    midi_file = MidiFile()
-    midi_file.tracks.append(midi_track)
-    midi_file.save(output_path)
+        output_difficulties = []
+
+        bars = Sequence.split_into_bars([sequence])
+        for bar in bars:
+            output_difficulties.append(convert_difficulty(bar.difficulty()))
+
+        deviation = _deviation(_deviation, desired_difficulty)
+        deviations.append((i, deviation))
+
+    sorted(deviations, key=itemgetter(1))
+    sequence = deviations[0]
+
+    # current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
+    #
+    # midi_track = sequence.to_midi_track()
+    # midi_file = MidiFile()
+    # midi_file.tracks.append(midi_track)
+    # midi_file.save(output_path)
 
 
 def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
@@ -340,3 +363,15 @@ def _load_data(network_type, batch):
         raise NotImplementedError
 
     return inputs, target
+
+
+def _deviation(values, mu, power_raise=2):
+    values = tf.convert_to_tensor(values)
+    mu_tensor = tf.fill([len(values)], mu)
+    subtract = tf.subtract(values, mu_tensor)
+    power = tf.pow(subtract, power_raise)
+    red_sum = tf.reduce_sum(power)
+    divide = tf.divide(red_sum, len(values))
+    root = tf.pow(divide, 1 / power_raise)
+
+    return root

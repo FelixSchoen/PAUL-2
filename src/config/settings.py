@@ -6,6 +6,10 @@ import tensorflow as tf
 ROOT_LOGGER = "paul"
 
 
+# =============
+# === Paths ===
+# =============
+
 def get_project_root() -> str:
     root_path = Path(__file__).parent.parent.parent
     return str(root_path)
@@ -31,8 +35,9 @@ PATH_CHECKPOINT = ROOT_PATH + PATH_OUT_PAUL + "/checkpoint"
 PATH_MIDI = ROOT_PATH + PATH_OUT_PAUL + "/gen"
 PATH_TENSORBOARD = ROOT_PATH + "/out/tensorboard"
 
-# How large a chunk of 4 bars should be
-PREP_CHUNK_SIZE = 128
+# =====================
+# === Preprocessing ===
+# =====================
 
 # Length of tensors representing sequences
 SEQUENCE_MAX_LENGTH = 1024
@@ -41,6 +46,7 @@ CONSECUTIVE_BAR_MAX_LENGTH = 8
 # Which time signatures to use
 VALID_TIME_SIGNATURES = [(2, 2), (2, 4), (3, 4), (4, 4), (5, 4), (6, 4), (9, 4), (3, 8), (4, 8), (5, 8), (6, 8), (7, 8),
                          (8, 8), (9, 8), (12, 8), ]
+# How many difficulty classes to use
 DIFFICULTY_VALUE_SCALE = 10
 
 # Vocabulary sizes
@@ -51,6 +57,7 @@ INPUT_VOCAB_SIZE_DIF = DIFFICULTY_VALUE_SCALE + 3
 
 # Token
 D_TYPE = tf.uint8
+PADDING_TOKEN = 0
 START_TOKEN = 1
 STOP_TOKEN = 2
 
@@ -63,6 +70,7 @@ SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
 EPOCHS = 32
+OUTPUT_DIMENSION = 8
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked

@@ -1,7 +1,9 @@
 import logging
+import os
 
-import numpy as np
 import tensorflow as tf
+
+from src.config.settings import D_TYPE, SEQUENCE_MAX_LENGTH
 
 
 def test_mask_multiplication():
@@ -29,9 +31,30 @@ def test_different_dimensions():
 
 
 def test_categorical():
-    samples = tf.random.categorical(tf.math.log([[0, 0.5]]), 5)
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+    samples = tf.random.categorical(tf.math.log([[0, 0.5, 1], [1, 2, 3]]), 1)
 
     print(samples)
-    print(tf.math.log([[0, 0.5]]))
 
-    print(0*-np.inf)
+
+def test_tensor_array():
+    to_fill = 128
+
+    array = tf.TensorArray(D_TYPE, size=SEQUENCE_MAX_LENGTH, dynamic_size=False)
+    for to_f in range(to_fill):
+        array = array.write(to_f, 1)
+    tensor = array.stack()
+
+    print(tensor)
+
+
+def test_prediction():
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    predictions = tf.constant([[1, 2, 3, 5, 4], [6, 15, 8, 9, 10], [11, 12, 13, 14, 15]], dtype=tf.float32)
+
+    am = tf.argmax(predictions, axis=-1)
+    print(am)
+
+    ct = tf.squeeze(tf.random.categorical(predictions / 0.1, 1), [-1])
+    print(ct)

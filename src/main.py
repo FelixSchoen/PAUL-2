@@ -51,7 +51,8 @@ def main():
         if args.track == "lead":
             logger.info(f"Generating lead track with difficulty {args.difficulty}...")
 
-            generate(network_type=NetworkType.lead, model_identifier=args.model_identifier, difficulty=args.difficulty)
+            generate(network_type=NetworkType.lead, model_identifier=args.model_identifier,
+                     difficulty=args.difficulty - 1)
         pass
 
 
