@@ -3,7 +3,7 @@ import os
 
 import tensorflow as tf
 
-from src.config.settings import D_TYPE, SEQUENCE_MAX_LENGTH
+from src.config.settings import D_TYPE, SEQUENCE_MAX_LENGTH, START_TOKEN
 
 
 def test_mask_multiplication():
@@ -45,6 +45,24 @@ def test_tensor_array():
     for to_f in range(to_fill):
         array = array.write(to_f, 1)
     tensor = array.stack()
+
+    print(tensor)
+
+
+def test_stack_tensor_arrays():
+    size = 5
+
+    arrays = []
+
+    for i in range(size):
+        array = tf.TensorArray(D_TYPE, size=SEQUENCE_MAX_LENGTH, dynamic_size=False)
+        array = array.write(0, START_TOKEN)
+        arrays.append(array)
+        print(array.stack())
+
+    array_list = [tensor_array.stack() for tensor_array in arrays]
+    print(array_list)
+    tensor = tf.stack(array_list)
 
     print(tensor)
 

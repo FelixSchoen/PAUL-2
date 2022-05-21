@@ -6,12 +6,13 @@ from operator import itemgetter
 
 import tensorflow as tf
 from sCoda import Sequence, Message
+from sCoda.util.util import get_note_durations, get_tuplet_durations
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, DIFFICULTY_VALUE_SCALE
+    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, DIFFICULTY_VALUE_SCALE, PATH_MIDI
 from src.network.attention import AttentionType
 from src.network.generator import Generator, TemperatureSchedule
 from src.network.masking import MaskType
@@ -277,11 +278,20 @@ def generate(network_type, model_identifier, difficulty):
 
     schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
 
-    sequences, attention_weights = generator(input_sequence=seq, difficulty=difficulty, temperature=1.5)
+    sequences, attention_weights = generator(input_sequence=seq, difficulty=difficulty, temperature=0.4)
+
+    # Construct quantisation parameters
+    quantise_parameters = get_note_durations(1, 8)
+    quantise_parameters += get_tuplet_durations(quantise_parameters, 3, 2)
+
+    logger.info("Calculating difficulties...")
 
     deviations = []
     # Calculate difficulty deviations
     for i, sequence in enumerate(sequences):
+        sequence.quantise(quantise_parameters)
+        sequence.quantise_note_lengths()
+
         desired_difficulty = difficulty
         if desired_difficulty == DIFFICULTY_VALUE_SCALE - 1:
             desired_difficulty = DIFFICULTY_VALUE_SCALE
@@ -289,22 +299,19 @@ def generate(network_type, model_identifier, difficulty):
         output_difficulties = []
 
         bars = Sequence.split_into_bars([sequence])
-        for bar in bars:
+        for bar in bars[0]:
             output_difficulties.append(convert_difficulty(bar.difficulty()))
 
-        deviation = _deviation(_deviation, desired_difficulty)
-        deviations.append((i, deviation))
+        deviation = _deviation(output_difficulties, desired_difficulty)
+        deviations.append((sequence, deviation))
 
-    sorted(deviations, key=itemgetter(1))
-    sequence = deviations[0]
+    deviations = sorted(deviations, key=itemgetter(1))
+    print(deviations)
+    sequence = deviations[0][0]
 
-    # current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    # output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
-    #
-    # midi_track = sequence.to_midi_track()
-    # midi_file = MidiFile()
-    # midi_file.tracks.append(midi_track)
-    # midi_file.save(output_path)
+    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
+    sequence.save(output_path)
 
 
 def store_checkpoint(network_type, run_identifier, checkpoint_identifier):

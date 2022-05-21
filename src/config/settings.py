@@ -70,7 +70,7 @@ SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
 EPOCHS = 32
-OUTPUT_DIMENSION = 8
+OUTPUT_DIMENSION = 16
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
