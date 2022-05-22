@@ -6,6 +6,7 @@ import random
 import re
 from itertools import starmap
 from multiprocessing import Pool
+from operator import itemgetter
 
 import mido
 import numpy as np
@@ -16,9 +17,8 @@ from sCoda.util.util import get_note_durations, get_tuplet_durations
 from tensorflow import Tensor
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
-    VALID_TIME_SIGNATURES, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, \
-    START_TOKEN, STOP_TOKEN, D_TYPE, TRAIN_VAL_SPLIT, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, SHUFFLE_SEED
+    VALID_TIME_SIGNATURES, START_TOKEN, STOP_TOKEN, D_TYPE, TRAIN_VAL_SPLIT, \
+    SHUFFLE_SEED, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_BARS_VAL_OUTPUT_FOLDER_PATH
 from src.exception.exceptions import UnexpectedValueException
 from src.util.logging import get_logger
 from src.util.util import flatten, pickle_save, pickle_load, convert_difficulty
@@ -38,8 +38,6 @@ def load_midi(input_dir: str) -> None:
         input_dir: The directory to load the files from
 
     """
-    logger = get_logger(__name__)
-
     file_paths = []
 
     # Handle all MIDI files in the given directory and subdirectories
@@ -47,55 +45,55 @@ def load_midi(input_dir: str) -> None:
         for file_name in [f for f in filenames if f.endswith(".mid")]:
             file_paths.append((os.path.join(dir_path, file_name), file_name))
 
+    random.Random(SHUFFLE_SEED).shuffle(file_paths)
+    split_point = int((len(file_paths) + 1) * TRAIN_VAL_SPLIT)
+    train_paths = sorted(file_paths[:split_point], key=itemgetter(1))
+    val_paths = sorted(file_paths[split_point:], key=itemgetter(1))
+
+    _load_midi_process_file_paths(train_paths, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH)
+    _load_midi_process_file_paths(val_paths, DATA_BARS_VAL_OUTPUT_FOLDER_PATH)
+
+
+def _load_midi_process_file_paths(file_paths, output_path):
+    logger = get_logger(__name__)
     pool = Pool(multiprocessing.cpu_count() - 1)
 
     for file_tuple in file_paths:
         file_path, file_name = file_tuple
 
-        if os.path.exists(f"{DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip") and os.path.exists(
-                f"{DATA_BARS_VAL_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip"):
+        if os.path.exists(f"{output_path}/{file_name[:-4]}.zip"):
             logger.info(f"Skipping {file_name}...")
             continue
 
         logger.info(f"Loading {file_name}...")
-        compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_stretch, zip([file_path]))))
+        compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_scale, zip([file_path]))))
 
         logger.info("Loading bars...")
-        bars = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
+        bar_tuples = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
 
         logger.info("Calculating difficulty...")
-        bars = list(pool.starmap(_load_midi_calculate_difficulty, zip(bars)))
+        bar_tuples = list(pool.starmap(_load_midi_calculate_difficulty, zip(bar_tuples)))
 
         # Shuffle bars
-        random.Random(SHUFFLE_SEED).shuffle(bars)
-
-        # Split into train and val data
-        split_point = int((len(bars) + 1) * TRAIN_VAL_SPLIT)
-        train_bars = bars[:split_point]
-        val_bars = bars[split_point:]
+        random.Random(SHUFFLE_SEED).shuffle(bar_tuples)
 
         logger.info("Transposing bars...")
-        train_bars_trans = flatten(
-            list(pool.starmap(_load_midi_transpose_bars, zip(train_bars))))
-        val_bars_trans = flatten(
-            list(pool.starmap(_load_midi_transpose_bars, zip(val_bars))))
+        bars_transposed = flatten(list(pool.starmap(_load_midi_transpose_bars, zip(bar_tuples))))
 
         logger.info("Storing bars...")
-        train_zip_file_path = f"{DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip"
-        val_zip_file_path = f"{DATA_BARS_VAL_OUTPUT_FOLDER_PATH}/{file_name[:-4]}.zip"
-        pickle_save(train_bars_trans, train_zip_file_path)
-        pickle_save(val_bars_trans, val_zip_file_path)
+        zip_file_path = f"{output_path}/{file_name[:-4]}.zip"
+        pickle_save(bars_transposed, zip_file_path)
 
         gc.collect()
 
 
-def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
-    """ Loads the MIDI file stored at the file path, stretches it, and returns a list of compositions.
+def _load_midi_load_composition_and_scale(file_path: str) -> [Composition]:
+    """ Loads the MIDI file stored at the file path, scales it, and returns a list of compositions.
 
     Args:
         file_path: File path of the MIDI file
 
-    Returns: A list of stretched compositions
+    Returns: A list of scaled compositions
 
     """
     lead_tracks = []
@@ -115,34 +113,30 @@ def _load_midi_load_composition_and_stretch(file_path: str) -> [Composition]:
             meta_tracks.append(t)
 
     compositions = []
-    stretch_factors = [0.5, 1, 2]
+    scale_factors = [0.5, 1, 2]
 
     # Load sequences from file
     sequences = Sequence.sequences_from_midi_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
 
-    # Construct quantisation parameters
-    quantise_parameters = get_note_durations(1, 8)
-    quantise_parameters += get_tuplet_durations(quantise_parameters, 3, 2)
-
-    # Stretch sequences by given factors
-    for stretch_factor in stretch_factors:
-        stretched_sequences = []
+    # Scale sequences by given factors
+    for scale_factor in scale_factors:
+        scaled_sequences = []
 
         for sequence in sequences:
-            stretched_sequence = copy.copy(sequence)
+            scaled_sequence = copy.copy(sequence)
 
-            stretched_sequence.quantise(quantise_parameters)
-            stretched_sequence.quantise_note_lengths()
+            scaled_sequence.quantise()
+            scaled_sequence.quantise_note_lengths()
 
-            stretched_sequence.stretch(stretch_factor)
+            scaled_sequence.scale(scale_factor, sequences[0])
 
-            stretched_sequence.quantise(quantise_parameters)
-            stretched_sequence.quantise_note_lengths()
+            scaled_sequence.quantise()
+            scaled_sequence.quantise_note_lengths()
 
-            stretched_sequences.append(stretched_sequence)
+            scaled_sequences.append(scaled_sequence)
 
-        # Create composition from stretched sequences
-        compositions.append(Composition.from_sequences(stretched_sequences))
+        # Create composition from scaled sequences
+        compositions.append(Composition.from_sequences(scaled_sequences))
 
     return compositions
 
@@ -173,7 +167,7 @@ def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
     remaining = CONSECUTIVE_BAR_MAX_LENGTH
     for lead_bar, acmp_bar in zip(lead_track.bars, acmp_track.bars):
         # Check if time signature of bar is valid
-        signature = (int(lead_bar._time_signature_numerator), int(lead_bar._time_signature_denominator))
+        signature = (int(lead_bar.time_signature_numerator), int(lead_bar.time_signature_denominator))
 
         # Split at non-valid time signature
         if signature not in VALID_TIME_SIGNATURES:

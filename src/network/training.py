@@ -3,7 +3,7 @@ import tensorflow as tf
 from src.config.settings import D_TYPE
 from src.network.optimization import accuracy_function, loss_function
 
-# TODO
+
 class Trainer:
     strategy, transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy, signature = \
         None, None, None, None, None, None, None, None
@@ -24,7 +24,7 @@ class Trainer:
         ]
 
     @staticmethod
-    @tf.function  # (input_signature=signature)
+    @tf.function
     def train_step(inputs, target):
         tar_inp = target[:, :-1]
         tar_real = target[:, 1:]

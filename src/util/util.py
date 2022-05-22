@@ -32,8 +32,7 @@ def convert_difficulty(difficulty):
     """
     if not 0 <= difficulty <= 1:
         print(difficulty)
-    # TODO
-    # assert 0 <= difficulty <= 1
+    assert 0 <= difficulty <= 1
 
     return math.floor(min(DIFFICULTY_VALUE_SCALE - 1, difficulty * DIFFICULTY_VALUE_SCALE))
 
