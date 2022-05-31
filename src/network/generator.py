@@ -149,8 +149,9 @@ class Generator(tf.Module):
         return output_sequences, attention_weights
 
     @staticmethod
-    def _create_tensor_arrays_from_sequence(sequence, size=SEQUENCE_MAX_LENGTH, write_stop_token=False):
-        tokenizer = Tokenizer()
+    def _create_tensor_arrays_from_sequence(sequence, size=SEQUENCE_MAX_LENGTH, write_stop_token=False,
+                                            skip_time_signature=False):
+        tokenizer = Tokenizer(skip_time_signature=skip_time_signature)
         end_index = 0
 
         tensor_arrays = []
@@ -174,7 +175,7 @@ class Generator(tf.Module):
                 end_index = i + 2
 
         if write_stop_token:
-            for j, tensor_array in tensor_arrays:
+            for j, tensor_array in enumerate(tensor_arrays):
                 tensor_arrays[j] = tensor_array.write(end_index, STOP_TOKEN)
 
         return tensor_arrays, len(tokens)
@@ -186,7 +187,7 @@ class Generator(tf.Module):
 
     @staticmethod
     def _create_valid_messages_from_sequence(sequence, desired_bars, force_time_signature):
-        return sequence._get_rel().get_valid_next_messages(desired_bars=desired_bars,
+        return sequence.rel.get_valid_next_messages(desired_bars=desired_bars,
                                                            force_time_siganture=force_time_signature)
 
     @staticmethod

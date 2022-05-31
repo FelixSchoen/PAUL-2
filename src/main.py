@@ -1,7 +1,8 @@
 import argparse
 
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH, ACMP_OUTPUT_VOCAB_SIZE, \
+    set_settings
 from src.network.paul import train_network, generate, store_checkpoint
 from src.preprocessing.preprocessing import store_records, load_midi
 from src.util.enumerations import NetworkType
@@ -25,24 +26,25 @@ def main():
             logger.info("Loading MIDI files...")
             load_midi(f"{DATA_MIDI_INPUT_PATH}")
 
-            return
-
         logger.info("Storing TFRecords...")
         store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_dir=DATA_TRAIN_OUTPUT_FILE_PATH)
         store_records(input_dir=DATA_BARS_VAL_OUTPUT_FOLDER_PATH, output_dir=DATA_VAL_OUTPUT_FILE_PATH)
 
-        logger.info("Successfully processed MIDI files.")
+        logger.info("Successfully"
+                    " processed MIDI files.")
     elif args.command == "train":
+        run_identifier = args.run_identifier
+
         if args.network == "lead":
             logger.info("Starting training process for lead network...")
 
-            train_network(network_type=NetworkType.lead)
+            train_network(network_type=NetworkType.lead, run_identifier=run_identifier)
 
             logger.info("Successfully trained lead network.")
         elif args.network == "acmp":
             logger.info("Starting training process for acmp network...")
 
-            train_network(network_type=NetworkType.acmp)
+            train_network(network_type=NetworkType.acmp, run_identifier=run_identifier)
 
             logger.info("Successfully trained acmp network.")
     elif args.command == "store":
@@ -55,7 +57,11 @@ def main():
 
             generate(network_type=NetworkType.lead, model_identifier=args.model_identifier,
                      difficulty=args.difficulty - 1)
-        pass
+        elif args.track == "acmp":
+            logger.info(f"Generating acmp track with difficulty {args.difficulty}...")
+
+            generate(network_type=NetworkType.acmp, model_identifier=args.model_identifier,
+                     difficulty=args.difficulty - 1)
 
 
 def parse_arguments():
@@ -74,6 +80,8 @@ def parse_arguments():
     parser_train.set_defaults(command="train")
     parser_train.add_argument("network", choices=["lead", "acmp"],
                               help="Selects which network to train.")
+    parser_train.add_argument("--run_identifier", "-r",
+                              help="Determines which run to continue.")
 
     # Store Command
     parser_generate = subparsers.add_parser("store", aliases=["s"],

@@ -13,7 +13,6 @@ import numpy as np
 import tensorflow as tf
 from sCoda import Composition, Bar, Sequence
 from sCoda.elements.message import MessageType
-from sCoda.util.util import get_note_durations, get_tuplet_durations
 from tensorflow import Tensor
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
@@ -217,10 +216,10 @@ def _load_midi_calculate_difficulty(bar_tuple: ([Bar], [Bar])) -> ([Bar], [Bar])
     """
     for bar in bar_tuple[0]:
         bar.difficulty()
-        assert bar._sequence._difficulty is not None
+        assert bar.sequence._difficulty is not None
     for bar in bar_tuple[1]:
         bar.difficulty()
-        assert bar._sequence._difficulty is not None
+        assert bar.sequence._difficulty is not None
 
     return bar_tuple
 
@@ -245,8 +244,8 @@ def _load_midi_transpose_bars(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
         acmp_unedited = [bar.__copy__() for bar in base_bars[1]]
 
         for lead_bar, acmp_bar in zip(lead_unedited, acmp_unedited):
-            assert lead_bar._sequence._difficulty is not None
-            assert acmp_bar._sequence._difficulty is not None
+            assert lead_bar.sequence._difficulty is not None
+            assert acmp_bar.sequence._difficulty is not None
 
             # Transpose bars
             lead_bar.transpose(transpose_by)
@@ -378,7 +377,7 @@ def _store_records_convert_to_tensor(lead_seq, lead_dif, acmp_seq, acmp_dif) -> 
         lead_seq: Lead sequence tokens
         lead_dif: Lead difficulties tokens
         acmp_seq: Accompanying sequence token
-        acmp_dif: Accompaying difficulties token
+        acmp_dif: Accompanying difficulties token
 
     Returns: A tuple of Tensors
 

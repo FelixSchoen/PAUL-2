@@ -22,7 +22,7 @@ from src.network.transformer import Transformer
 from src.preprocessing.preprocessing import load_records
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
-from src.util.util import get_src_root, convert_difficulty
+from src.util.util import get_src_root, convert_difficulty, get_prj_root
 
 
 def get_strategy():
@@ -85,7 +85,7 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
     return transformer, trainer
 
 
-def train_network(network_type, start_epoch=0, run_identifier=None):
+def train_network(network_type, run_identifier=None):
     logger = get_logger(__name__)
 
     strategy = get_strategy()
@@ -143,33 +143,39 @@ def train_network(network_type, start_epoch=0, run_identifier=None):
                                                    train_loss=train_loss, train_accuracy=train_accuracy,
                                                    val_loss=val_loss, val_accuracy=val_accuracy)
 
-        # For restarting at a later epoch
-        start_epoch = tf.Variable(start_epoch)
-
         # Setup time and run identifier
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
         if run_identifier is None:
             run_identifier = current_time
 
+        # For restarting at a later epoch
+        start_epoch = tf.Variable(0)
+
         # Set checkpoint
         checkpoint = tf.train.Checkpoint(transformer=transformer,
-                                         optimizer=optimizer,
-                                         epoch=start_epoch)
+                                         optimizer=optimizer)
         checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {run_identifier}"
         checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
 
         # If checkpoint exists, restore it
         if checkpoint_manager.latest_checkpoint:
+            start_epoch = tf.Variable(len(checkpoint_manager.checkpoints))
+
             checkpoint.restore(checkpoint_manager.latest_checkpoint)
             logger.info(
-                f"Restored checkpoint, will start from epoch {start_epoch.numpy() + 1}, {optimizer.iterations.numpy()} "
-                f"iterations already completed.")
-            log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}"
+                f"Restored checkpoint for epoch {len(checkpoint_manager.checkpoints)}. "
+                f"Will start from epoch {start_epoch.numpy() + 1}. "
+                f"{optimizer.iterations.numpy()} iterations already completed.")
+
+            train_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/train"
+            val_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/val"
         else:
-            log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}"
+            train_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/train"
+            val_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/val"
 
         # Tensorboard setup
-        summary_writer = tf.summary.create_file_writer(log_dir)
+        train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+        val_summary_writer = tf.summary.create_file_writer(val_log_dir)
 
         logger.info("Starting training process...")
         for epoch in range(start_epoch.numpy(), EPOCHS):
@@ -212,20 +218,19 @@ def train_network(network_type, start_epoch=0, run_identifier=None):
                     trainer.train_step(inputs, target)
 
                 # Tensorboard
-                with summary_writer.as_default():
+                with train_summary_writer.as_default():
                     tf.summary.scalar("train_loss", train_loss.result(), step=optimizer.iterations)
                     tf.summary.scalar("train_accuracy", train_accuracy.result(), step=optimizer.iterations)
 
                 # Logging
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
-                if batch_num - 1 % 100 == 0 or batch_num == 0:
-                    logger.info(
-                        f"[E{epoch + 1:02d}B{batch_num + 1:05d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
-                        f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
+                logger.info(
+                    f"[E{epoch + 1:02d}B{batch_num + 1:05d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
+                    f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
-                    # Reset timer
-                    batch_timer = time.time()
-                    tf.config.experimental.reset_memory_stats("GPU:0")
+                # Reset timer
+                batch_timer = time.time()
+                tf.config.experimental.reset_memory_stats("GPU:0")
 
             logger.info(f"[E{epoch + 1:02d}]: Calculating validation statistics...")
 
@@ -241,9 +246,9 @@ def train_network(network_type, start_epoch=0, run_identifier=None):
                     trainer.val_step(inputs, target)
 
             # Tensorboard
-            with summary_writer.as_default():
-                tf.summary.scalar("val_loss", val_loss.result(), step=epoch)
-                tf.summary.scalar("val_accuracy", val_accuracy.result(), step=epoch)
+            with val_summary_writer.as_default():
+                tf.summary.scalar("val_loss", val_loss.result(), step=epoch + 1)
+                tf.summary.scalar("val_accuracy", val_accuracy.result(), step=epoch + 1)
 
             # Logging
             logger.info(f"[E{epoch + 1:02d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
@@ -259,7 +264,7 @@ def train_network(network_type, start_epoch=0, run_identifier=None):
         transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{run_identifier}.h5")
 
 
-def generate(network_type, model_identifier, difficulty):
+def generate(network_type, model_identifier, difficulty, lead_sequence=None):
     logger = get_logger(__name__)
 
     # Load model
@@ -268,13 +273,21 @@ def generate(network_type, model_identifier, difficulty):
     transformer.build_model()
     transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
 
-    generator = Generator(transformer, network_type)
-
     # Create starting sequence
     seq = Sequence()
+    lead_seq = None
+
     if network_type == NetworkType.lead:
         seq.add_relative_message(
             Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
+    elif network_type == NetworkType.acmp:
+        lead_seq = lead_sequence
+
+        # TODO
+        lead_seq = \
+        Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/3_20220530-111731.mid", [[0]], [])[0]
+
+    generator = Generator(transformer, network_type, lead_sequence=lead_seq)
 
     schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
 
@@ -306,8 +319,10 @@ def generate(network_type, model_identifier, difficulty):
         deviations.append((sequence, deviation))
 
     deviations = sorted(deviations, key=itemgetter(1))
-    print(deviations)
+    logger.info(f"Deviations: {deviations}")
     sequence = deviations[0][0]
+
+    logger.info(f"Saving generated sequence...")
 
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
@@ -327,8 +342,6 @@ def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
     transformer, _ = get_network_objects(network_type)
     transformer.build_model()
 
-    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-
     # Setup checkpoint
     checkpoint = tf.train.Checkpoint(transformer=transformer,
                                      optimizer=optimizer)
@@ -336,9 +349,9 @@ def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
     checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
     checkpoint.restore(checkpoint_manager.checkpoints[checkpoint_identifier])
 
-    transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{current_time}.h5")
+    transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{run_identifier}.h5")
 
-    logger.info(f"Stored model {current_time} from epoch {checkpoint_identifier}.")
+    logger.info(f"Stored model {run_identifier} from epoch {checkpoint_identifier + 1}.")
 
 
 def _load_data(network_type, batch):

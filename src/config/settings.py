@@ -3,6 +3,8 @@ from pathlib import Path
 import tensorflow as tf
 
 # Name of the root logger
+from src.util.enumerations import NetworkType
+
 ROOT_LOGGER = "paul"
 
 
@@ -69,7 +71,7 @@ TRAIN_VAL_SPLIT = 0.9
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
-EPOCHS = 32
+EPOCHS = 6
 OUTPUT_DIMENSION = 16
 
 # Parameters explained in order of appearance:
@@ -78,7 +80,16 @@ OUTPUT_DIMENSION = 16
 # Dimension of the model
 # Dimension of the feed-forward network
 # Dropout rate applied after some operations
-SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 16, "NUM_LAYERS": 6, "NUM_HEADS": 8, "D_MODEL": 512, "DFF": 2048,
+SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
-SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 8, "D_MODEL": 128, "DFF": 1024,
-                             "DROPOUT_RATE": 0.1, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
+SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 64, "DFF": 128,
+                             "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
+
+
+def set_settings(settings, network):
+    if network == NetworkType.lead:
+        global SETTINGS_LEAD_TRANSFORMER
+        SETTINGS_LEAD_TRANSFORMER = settings
+    elif network == NetworkType.acmp:
+        global SETTINGS_ACMP_TRANSFORMER
+        SETTINGS_ACMP_TRANSFORMER = settings

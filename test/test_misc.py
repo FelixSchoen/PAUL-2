@@ -2,8 +2,10 @@ import logging
 import os
 
 import tensorflow as tf
+from sCoda import Sequence
 
-from src.config.settings import D_TYPE, SEQUENCE_MAX_LENGTH, START_TOKEN
+from src.config.settings import D_TYPE, SEQUENCE_MAX_LENGTH, START_TOKEN, DATA_TRAIN_OUTPUT_FILE_PATH
+from src.preprocessing.preprocessing import load_records
 
 
 def test_mask_multiplication():
@@ -76,3 +78,14 @@ def test_prediction():
 
     ct = tf.squeeze(tf.random.categorical(predictions / 0.1, 1), [-1])
     print(ct)
+
+
+def test_load_seq():
+    lead_seq = Sequence.sequences_from_midi_file("resources/beethoven_027-2_m3_4.mid", [[0]], [])[0]
+    print(lead_seq)
+    for msg in lead_seq.rel.messages:
+        print(msg)
+
+
+def test_data_shape():
+    print(-1e9)

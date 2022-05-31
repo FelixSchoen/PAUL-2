@@ -58,6 +58,11 @@ def get_src_root() -> str:
     return str(root_path)
 
 
+def get_prj_root() -> str:
+    root_path = Path(__file__).parent.parent.parent
+    return str(root_path)
+
+
 def pickle_load(file_path):
     with gzip.open(file_path, "rb") as f:
         return pickle.load(f)

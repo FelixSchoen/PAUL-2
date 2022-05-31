@@ -15,7 +15,6 @@ from src.network.optimization import TransformerLearningRateSchedule
 from src.network.positional_encoding import positional_encoding
 from src.network.training import Trainer
 from src.network.transformer import Encoder, Decoder, Transformer
-from src.config.settings import D_MODEL
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
@@ -171,6 +170,7 @@ def test_transformer():
 
 
 def test_learning_rate():
+    D_MODEL = 128
     temp_learning_rate_schedule = TransformerLearningRateSchedule(D_MODEL)
 
     plt.plot(temp_learning_rate_schedule(tf.range(40000, dtype=tf.float32)))
@@ -246,21 +246,23 @@ def test_combined():
     val_loss = tf.keras.metrics.Mean(name="val_loss")
     val_accuracy = tf.keras.metrics.Mean(name="val_accuracy")
 
+    D_MODEL = 128
     learning_rate = TransformerLearningRateSchedule(D_MODEL)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                          epsilon=1e-9)
 
     transformer = Transformer(num_layers=4,
-                              d_model=128,
+                              d_model=D_MODEL,
                               num_heads=8,
                               dff=512,
-                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy(),
-                                                 tokenizers.pt.get_vocab_size().numpy()],
+                              input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
                               target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
-                              num_encoders=2,
+                              num_encoders=1,
                               attention_type=AttentionType.absolute,
-                              max_relative_distance=max_tokens)
+                              max_relative_distance=max_tokens,
+                              mask_types_enc=[MaskType.padding],
+                              mask_types_dec=[MaskType.padding])
 
     epochs = 1
 
@@ -270,15 +272,14 @@ def test_combined():
         train_loss.reset_states()
         train_accuracy.reset_states()
 
-        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy,
-                          [MaskType.padding, MaskType.padding], strategy=None)
+        trainer = Trainer(transformer, optimizer, train_loss, train_accuracy, val_loss, val_accuracy, strategy=None)
 
         # inp -> portuguese, tar -> english
         for (batch, (inp, tar)) in enumerate(train_batches):
-            trainer.train_step([inp, inp], tar)
+            trainer.train_step([inp], tar)
 
             print(
-                f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
+                f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.8f}')
 
         print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
