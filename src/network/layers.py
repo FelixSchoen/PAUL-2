@@ -155,13 +155,14 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         # Sequence is not longer than max_sequence, can fit entirely
         if max_len >= seq_len:
-            return E(np.arange(max_len - seq_len, max_len))
+            val = np.arange(-1 * seq_len + 1, 1)
+            return E(val)
 
         # For sequences that are too long, simply set maximum distance for values that are too far apart
-        return tf.concat(values=[*[E(np.arange(0, 1))
-                                   for _ in range(seq_len - max_len)],
-                                 E(np.arange(0, max_len))],
-                         axis=0)
+        pre = [-1 * max_len + 1 for _ in range(seq_len - max_len)]
+        post = np.arange(-1 * max_len + 1, 1)
+        val = np.concatenate((pre, post))
+        return E(val)
 
     def call(self, v, k, q, mask):
         # Pipe Q, K, V through the dense layer, adds dimension d_model at the end, shape: (batch_size, seq_len, d_model)

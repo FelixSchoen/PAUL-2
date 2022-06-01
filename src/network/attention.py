@@ -46,6 +46,7 @@ def scaled_dot_product_attention(q, k, v, mask):
     return output, attention_weights
 
 
+# Based on https://github.com/spectraldoy/MusicTransformerTensorFlow/blob/main/Music_Transformer_Public.ipynb
 def relative_scaled_dot_product_attention(q, k, v, e, mask):
     """ Calculates the relative attention weights for the queries, keys and values.
 

@@ -223,7 +223,7 @@ def test_relative_scaled_dot_product_attention():
 
 def test_embeddings():
     E = tf.keras.layers.Embedding(400, 200)
-    logger.info(f"Shape: {MultiHeadAttention.get_embeddings(E, 500, None).shape}")
+    logger.info(f"Shape: {MultiHeadAttention.get_embeddings(E, 200, 512).shape}")
 
 
 def test_relative_multi_head_attention():
@@ -259,7 +259,7 @@ def test_combined():
                               input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
                               target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
                               num_encoders=1,
-                              attention_type=AttentionType.absolute,
+                              attention_type=AttentionType.relative,
                               max_relative_distance=max_tokens,
                               mask_types_enc=[MaskType.padding],
                               mask_types_dec=[MaskType.padding])

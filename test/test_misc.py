@@ -1,11 +1,16 @@
 import logging
 import os
 
+import numpy as np
 import tensorflow as tf
 from sCoda import Sequence
 
 from src.config.settings import D_TYPE, SEQUENCE_MAX_LENGTH, START_TOKEN, DATA_TRAIN_OUTPUT_FILE_PATH
+from src.network.layers import MultiHeadAttention
 from src.preprocessing.preprocessing import load_records
+from src.util.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def test_mask_multiplication():
@@ -87,5 +92,18 @@ def test_load_seq():
         print(msg)
 
 
+def test_embedding():
+    E = tf.keras.layers.Embedding(400, 200)
+    logger.info(f"Shape: {MultiHeadAttention.get_embeddings(E, 520, 512).shape}")
+
+
 def test_data_shape():
-    print(-1e9)
+    a = np.arange(128 - 64, 128)
+    b = np.arange(-1 * (128 - 1), 1)
+    c = np.arange(0, 1)
+
+    print(a)
+    print(b)
+    print(c)
+    print(len(a))
+    print(len(b))
