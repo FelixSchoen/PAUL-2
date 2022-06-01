@@ -61,7 +61,8 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   num_encoders=1,
                                   mask_types_enc=[MaskType.singleout],
                                   mask_types_dec=[MaskType.singleout],
-                                  attention_type=AttentionType.relative,
+                                  attention_types=[[AttentionType.absolute],
+                                                   [AttentionType.self_relative, AttentionType.absolute]],
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
     elif network_type == NetworkType.acmp:
         transformer = Transformer(num_layers=num_layers,
@@ -73,7 +74,10 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   num_encoders=2,
                                   mask_types_enc=[MaskType.padding, MaskType.singleout],
                                   mask_types_dec=[MaskType.padding, MaskType.singleout],
-                                  attention_type=AttentionType.relative,
+                                  attention_types=[[AttentionType.absolute],
+                                                   [AttentionType.absolute],
+                                                   [AttentionType.self_relative, AttentionType.absolute,
+                                                    AttentionType.absolute]],
                                   max_relative_distance=SEQUENCE_MAX_LENGTH)
     else:
         raise NotImplementedError
@@ -285,7 +289,7 @@ def generate(network_type, model_identifier, difficulty, lead_sequence=None):
 
         # TODO
         lead_seq = \
-        Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/3_20220530-111731.mid", [[0]], [])[0]
+            Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/3_20220530-111731.mid", [[0]], [])[0]
 
     generator = Generator(transformer, network_type, lead_sequence=lead_seq)
 

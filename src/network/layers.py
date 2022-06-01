@@ -5,10 +5,10 @@ from src.network.attention import scaled_dot_product_attention, AttentionType, r
 
 
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, num_heads, dff, attention_type, max_relative_distance, rate=0.1):
+    def __init__(self, *, d_model, num_heads, dff, attention_types, max_relative_distance, rate=0.1):
         super(EncoderLayer, self).__init__()
 
-        self.mha = MultiHeadAttention(d_model=d_model, num_heads=num_heads, attention_type=attention_type,
+        self.mha = MultiHeadAttention(d_model=d_model, num_heads=num_heads, attention_type=attention_types[0],
                                       max_relative_distance=max_relative_distance)
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
 
@@ -37,14 +37,14 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 
 class DecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, num_heads, dff, num_encoders, attention_type, max_relative_distance, rate=0.1):
+    def __init__(self, *, d_model, num_heads, dff, num_encoders, attention_types, max_relative_distance, rate=0.1):
         super(DecoderLayer, self).__init__()
 
         self.num_encoders = num_encoders
 
-        self.mha = [MultiHeadAttention(d_model=d_model, num_heads=num_heads, attention_type=attention_type,
+        self.mha = [MultiHeadAttention(d_model=d_model, num_heads=num_heads, attention_type=attention_types[i],
                                        max_relative_distance=max_relative_distance)
-                    for _ in range(num_encoders + 1)]
+                    for i in range(num_encoders + 1)]
 
         self.pffn = PointwiseFeedForwardNetwork(d_model=d_model, dff=dff)
 
@@ -91,7 +91,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         super(MultiHeadAttention, self).__init__()
 
         assert d_model % num_heads == 0
-        assert not (attention_type == AttentionType.relative and max_relative_distance is None)
+        assert not (attention_type == AttentionType.self_relative and max_relative_distance is None)
 
         self.d_model = d_model
         self.num_heads = num_heads

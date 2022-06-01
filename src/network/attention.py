@@ -6,7 +6,7 @@ import tensorflow as tf
 
 class AttentionType(Enum):
     absolute = "absolute"
-    relative = "relative"
+    self_relative = "self_relative"
 
 
 def scaled_dot_product_attention(q, k, v, mask):

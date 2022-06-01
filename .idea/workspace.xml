@@ -3,10 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="b9f1f220-fe63-43a1-a011-91525046ee3e" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/network/attention.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/attention.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/network/layers.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/layers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/test_misc.py" beforeDir="false" afterPath="$PROJECT_DIR$/test/test_misc.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/network/paul.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/paul.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/network/transformer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/transformer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/test/test_network.py" beforeDir="false" afterPath="$PROJECT_DIR$/test/test_network.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -411,7 +411,7 @@
       <workItem from="1653939030647" duration="458000" />
       <workItem from="1653939521906" duration="55000" />
       <workItem from="1653939589168" duration="14855000" />
-      <workItem from="1654068525091" duration="14311000" />
+      <workItem from="1654068525091" duration="16937000" />
     </task>
     <task id="LOCAL-00001" summary="Refactor preprocessing">
       <created>1652958322426</created>
@@ -469,7 +469,14 @@
       <option name="project" value="LOCAL" />
       <updated>1653992984510</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Change position embedding value ranges">
+      <created>1654094175217</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1654094175217</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -495,7 +502,8 @@
     <MESSAGE value="Fix generator" />
     <MESSAGE value="Rework data preprocessing to exclude scaled compositions from validation set" />
     <MESSAGE value="Implement sCoda changes" />
-    <option name="LAST_COMMIT_MESSAGE" value="Implement sCoda changes" />
+    <MESSAGE value="Change position embedding value ranges" />
+    <option name="LAST_COMMIT_MESSAGE" value="Change position embedding value ranges" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Paul$main.coverage" NAME="Preprocess Coverage Results" MODIFIED="1652913168560" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />

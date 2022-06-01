@@ -106,7 +106,7 @@ def test_pointwise_feed_forward_network():
 
 
 def test_encoder_layer():
-    sample_encoder_layer = EncoderLayer(d_model=512, num_heads=8, dff=2048, attention_type=AttentionType.absolute,
+    sample_encoder_layer = EncoderLayer(d_model=512, num_heads=8, dff=2048, attention_types=AttentionType.absolute,
                                         max_relative_distance=None)
 
     sample_encoder_layer_output = sample_encoder_layer(tf.random.uniform((64, 43, 512)), False, None)
@@ -120,7 +120,7 @@ def test_decoder_layer():
     sample_encoder_layer_output = test_encoder_layer()
 
     sample_decoder_layer = DecoderLayer(d_model=512, num_heads=8, dff=2048, num_encoders=1,
-                                        attention_type=AttentionType.absolute, max_relative_distance=None)
+                                        attention_types=AttentionType.absolute, max_relative_distance=None)
 
     sample_decoder_layer_output, _ = sample_decoder_layer(tf.random.uniform((64, 50, 512)),
                                                           [sample_encoder_layer_output], False, None, [None])
@@ -130,7 +130,7 @@ def test_decoder_layer():
 
 def test_encoder():
     sample_encoder = Encoder(num_layers=2, d_model=512, num_heads=8, dff=2048, input_vocab_size=8500,
-                             attention_type=AttentionType.absolute, max_relative_distance=None)
+                             attention_types=AttentionType.absolute, max_relative_distance=None)
     temp_input = tf.random.uniform((64, 62), dtype=tf.int64, minval=0, maxval=200)
 
     sample_encoder_output = sample_encoder(temp_input, training=False, mask=None)
@@ -142,7 +142,7 @@ def test_encoder():
 
 def test_decoder():
     sample_decoder = Decoder(num_layers=2, d_model=512, num_heads=8,
-                             dff=2048, target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute,
+                             dff=2048, target_vocab_size=8000, num_encoders=1, attention_types=AttentionType.absolute,
                              max_relative_distance=None)
     temp_input = tf.random.uniform((64, 26), dtype=tf.int64, minval=0, maxval=200)
 
@@ -158,7 +158,7 @@ def test_decoder():
 
 def test_transformer():
     sample_transformer = Transformer(num_layers=2, d_model=512, num_heads=8, dff=2048, input_vocab_sizes=[8500],
-                                     target_vocab_size=8000, num_encoders=1, attention_type=AttentionType.absolute,
+                                     target_vocab_size=8000, num_encoders=1, attention_types=AttentionType.absolute,
                                      max_relative_distance=None)
 
     temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
@@ -229,7 +229,7 @@ def test_embeddings():
 def test_relative_multi_head_attention():
     # Create a MultiHeadAttention Block to test
     t = tf.random.uniform((10, 1500, 256))
-    mha = MultiHeadAttention(d_model=256, num_heads=8, attention_type=AttentionType.relative,
+    mha = MultiHeadAttention(d_model=256, num_heads=8, attention_type=AttentionType.self_relative,
                              max_relative_distance=1921)
     out, attn = mha(t, t, t, create_combined_mask(tf.random.uniform((10, 1500))))
 
@@ -259,7 +259,7 @@ def test_combined():
                               input_vocab_sizes=[tokenizers.pt.get_vocab_size().numpy()],
                               target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
                               num_encoders=1,
-                              attention_type=AttentionType.relative,
+                              attention_types=AttentionType.self_relative,
                               max_relative_distance=max_tokens,
                               mask_types_enc=[MaskType.padding],
                               mask_types_dec=[MaskType.padding])
