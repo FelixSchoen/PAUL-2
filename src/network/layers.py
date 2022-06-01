@@ -18,11 +18,11 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, training, mask):
+    def call(self, x, training, masks):
         # Multi Head Attention
 
         # Shape: (batch_size, input_seq_len, d_model)
-        attn_output, _ = self.mha(x, x, x, mask)
+        attn_output, _ = self.mha(x, x, x, masks[0])
         attn_output = self.dropout1(attn_output, training=training)
         # Shape: (batch_size, input_seq_len, d_model)
         out1 = self.norm1(x + attn_output)
@@ -54,16 +54,16 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.dropout = [tf.keras.layers.Dropout(rate)
                         for _ in range(num_encoders + 2)]
 
-    def call(self, x, enc_outputs, training, self_attention_mask, dec_masks):
+    def call(self, x, enc_outputs, training, masks):
         assert len(enc_outputs) == self.num_encoders
-        assert len(dec_masks) == self.num_encoders
+        assert len(masks) == self.num_encoders + 1
 
         # enc_ouputs Shapes:(batch_size, input_seq_len, d_model)
 
         attn_weights = []
 
         # Shape: (batch_size, target_seq_len, d_model)
-        attn, attn_weights_block = self.mha[0](x, x, x, self_attention_mask)
+        attn, attn_weights_block = self.mha[0](x, x, x, masks[0])
         attn_weights.append(attn_weights_block)
         attn = self.dropout[0](attn, training=training)
         out = self.norm[0](attn + x)
@@ -71,7 +71,7 @@ class DecoderLayer(tf.keras.layers.Layer):
         for enc_ind in range(self.num_encoders):
             # Shape: (batch_size, target_seq_len, d_model)
             attn, attn_weights_block = self.mha[enc_ind + 1](enc_outputs[enc_ind], enc_outputs[enc_ind], out,
-                                                             dec_masks[enc_ind])
+                                                             masks[enc_ind + 1])
             attn_weights.append(attn_weights_block)
             attn = self.dropout[enc_ind + 1](attn, training=training)
             # Shape: (batch_size, target_seq_len, d_model)

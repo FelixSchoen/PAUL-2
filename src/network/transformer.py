@@ -26,7 +26,7 @@ class Encoder(tf.keras.layers.Layer):
 
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, training, mask):
+    def call(self, x, training, masks):
         seq_len = tf.shape(x)[1]
 
         # Embedding and Encoding
@@ -42,7 +42,7 @@ class Encoder(tf.keras.layers.Layer):
 
         # Apply Encoder Layers
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x, training, mask)
+            x = self.enc_layers[i](x, training, masks)
 
         # Shape: (batch_size, input_seq_len, d_model)
         return x
@@ -67,9 +67,9 @@ class Decoder(tf.keras.layers.Layer):
 
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, enc_outputs, training, self_attention_mask, dec_masks):
+    def call(self, x, enc_outputs, training, masks):
         assert len(enc_outputs) == self.num_encoders
-        assert len(dec_masks) == self.num_encoders
+        assert len(masks) == self.num_encoders + 1
 
         seq_len = tf.shape(x)[1]
         attention_weights = {}
@@ -86,7 +86,7 @@ class Decoder(tf.keras.layers.Layer):
 
         # Apply Decoder Layers
         for i in range(self.num_layers):
-            x, blocks = self.dec_layers[i](x, enc_outputs, training, self_attention_mask, dec_masks)
+            x, blocks = self.dec_layers[i](x, enc_outputs, training, masks)
 
             for j, block in enumerate(blocks):
                 attention_weights[f'decoder_layer{i + 1}_block{j + 1}'] = block
@@ -97,16 +97,15 @@ class Decoder(tf.keras.layers.Layer):
 
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, num_heads, dff, input_vocab_sizes, target_vocab_size, num_encoders,
-                 mask_types_enc, mask_types_dec, attention_types, max_relative_distance, rate=0.1):
+                 mask_types, attention_types, max_relative_distance, rate=0.1):
         super().__init__()
 
         self.num_encoders = num_encoders
-        self.mask_types_enc = mask_types_enc
-        self.mask_types_dec = mask_types_dec
+        self.mask_types = mask_types
 
         assert num_encoders == len(input_vocab_sizes)
-        assert num_encoders == len(mask_types_enc)
-        assert num_encoders == len(mask_types_dec)
+        assert num_encoders == len(mask_types) - 1
+        assert num_encoders == len(mask_types[-1]) - 1
 
         self.encoders = [
             Encoder(num_layers=num_layers, d_model=d_model, num_heads=num_heads, dff=dff,
@@ -126,25 +125,32 @@ class Transformer(tf.keras.Model):
         # Pass all inputs in first argument
         inputs, target = omni_input
 
-        # Create encoder masks
-        enc_masks = []
-        for inp, mask_type in zip(inputs, self.mask_types_dec):
-            enc_masks.append(Transformer._build_mask(mask_type, inp))
+        masks = []
 
-        # Create decoder masks
-        dec_self_attention_mask = create_combined_mask(target)
-        dec_masks = []
-        for inp, mask_type in zip(inputs, self.mask_types_dec):
-            dec_masks.append(Transformer._build_mask(mask_type, inp, shift_by=1))
+        # Create masks
+        for i, mask_types in enumerate(self.mask_types):
+            masks.append([])
+
+            # Decoder Masks
+            if i == len(self.mask_types) - 1:
+                for j, mask_type in enumerate(mask_types):
+                    if j == 0:
+                        masks[i].append(Transformer._build_mask(mask_type, target))
+                    else:
+                        masks[i].append(Transformer._build_mask(mask_type, inputs[j - 1], shift_by=1))
+            # Encoder Masks
+            else:
+                for mask_type in mask_types:
+                    masks[i].append(Transformer._build_mask(mask_type, inputs[i]))
 
         # Collect Encoder Outputs
         enc_outputs = []
         for i, encoder in enumerate(self.encoders):
             # Shape: (batch_size, inp_seq_len, d_model)
-            enc_outputs.append(encoder(inputs[i], training, enc_masks[i]))
+            enc_outputs.append(encoder(inputs[i], training, masks[i]))
 
         # Shape: (batch_size, tar_seq_len, d_model)
-        dec_output, attention_weights = self.decoder(target, enc_outputs, training, dec_self_attention_mask, dec_masks)
+        dec_output, attention_weights = self.decoder(target, enc_outputs, training, masks[-1])
 
         # Shape: (batch_size, tar_seq_len, target_vocab_size)
         final_output = self.final_layer(dec_output)
