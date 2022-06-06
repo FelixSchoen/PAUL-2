@@ -1,8 +1,7 @@
 import argparse
 
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH, ACMP_OUTPUT_VOCAB_SIZE, \
-    set_settings
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
 from src.network.paul import train_network, generate, store_checkpoint
 from src.preprocessing.preprocessing import store_records, load_midi
 from src.util.enumerations import NetworkType

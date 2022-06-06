@@ -72,7 +72,6 @@ SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
 EPOCHS = 10
-OUTPUT_DIMENSION = 16
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
@@ -82,14 +81,17 @@ OUTPUT_DIMENSION = 16
 # Dropout rate applied after some operations
 SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
-SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 16, "NUM_LAYERS": 8, "NUM_HEADS": 8, "D_MODEL": 256, "DFF": 2048,
+SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
 
+# ==================
+# === Generation ===
+# ==================
 
-def set_settings(settings, network):
-    if network == NetworkType.lead:
-        global SETTINGS_LEAD_TRANSFORMER
-        SETTINGS_LEAD_TRANSFORMER = settings
-    elif network == NetworkType.acmp:
-        global SETTINGS_ACMP_TRANSFORMER
-        SETTINGS_ACMP_TRANSFORMER = settings
+# Determines how many sequences are generated in parallel when generating
+OUTPUT_DIMENSION = 16
+# The amount of consecutive bars to generate
+BARS_TO_GENERATE = 4
+# The initial amount of consecutive bars to generate, before checking if they all conform to the same difficulty
+BAR_GENERATION_STEP_SIZE = 1
+START_TEMPERATURE = 0.5

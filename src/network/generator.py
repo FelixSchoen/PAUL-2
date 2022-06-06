@@ -6,7 +6,8 @@ from sCoda import Sequence
 from sCoda.elements.message import MessageType, Message
 
 from src.config.settings import D_TYPE, START_TOKEN, SEQUENCE_MAX_LENGTH, STOP_TOKEN, SETTINGS_LEAD_TRANSFORMER, \
-    SETTINGS_ACMP_TRANSFORMER, VALID_TIME_SIGNATURES, OUTPUT_DIMENSION, PADDING_TOKEN, CONSECUTIVE_BAR_MAX_LENGTH
+    SETTINGS_ACMP_TRANSFORMER, VALID_TIME_SIGNATURES, OUTPUT_DIMENSION, PADDING_TOKEN, CONSECUTIVE_BAR_MAX_LENGTH, \
+    BARS_TO_GENERATE
 from src.preprocessing.preprocessing import Tokenizer, Detokenizer
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
@@ -20,7 +21,7 @@ class Generator(tf.Module):
         self.network_type = network_type
         self.lead_sequence = lead_sequence
 
-    def __call__(self, input_sequence, difficulty, temperature, bars=CONSECUTIVE_BAR_MAX_LENGTH):
+    def __call__(self, input_sequence, difficulty, temperature, bars_to_generate=BARS_TO_GENERATE):
         logger = get_logger(__name__)
 
         assert not (self.network_type == NetworkType.acmp and self.lead_sequence is None)
@@ -69,20 +70,17 @@ class Generator(tf.Module):
         else:
             raise NotImplementedError
 
-        logger.info("Starting generation process")
+        logger.info("Starting generation process.")
 
         # TODO Remove
         time_tracker = 0
 
         pool = multiprocessing.Pool()
-        bars_list = [bars for _ in range(OUTPUT_DIMENSION)]
+        bars_list = [bars_to_generate for _ in range(OUTPUT_DIMENSION)]
         force_time_signature_list = [self.network_type == NetworkType.lead for _ in range(OUTPUT_DIMENSION)]
 
         # Loop for up to remaining tokens time
         for i in tf.range(1 + len_input_seq, SEQUENCE_MAX_LENGTH - 1):
-            if i % 5 == 0 or i == 1 + len_input_seq:
-                logger.info(f"Iteration {i:03d}...")
-
             output_tensor = Generator._create_tensor_from_tensor_arrays(output_tensor_arrays)
 
             # Interference
@@ -188,7 +186,7 @@ class Generator(tf.Module):
     @staticmethod
     def _create_valid_messages_from_sequence(sequence, desired_bars, force_time_signature):
         return sequence.rel.get_valid_next_messages(desired_bars=desired_bars,
-                                                           force_time_siganture=force_time_signature)
+                                                    force_time_siganture=force_time_signature)
 
     @staticmethod
     def _create_mask_from_valid_messages(valid_messages_list, mask_length, finished_sequence_indices):

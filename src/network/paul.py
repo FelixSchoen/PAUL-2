@@ -2,19 +2,19 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime
-from operator import itemgetter
 
 import tensorflow as tf
-from sCoda import Sequence, Message
-from sCoda.util.util import get_note_durations, get_tuplet_durations
+from sCoda import Sequence, Bar, Message
+from sCoda.elements.message import MessageType
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, DIFFICULTY_VALUE_SCALE, PATH_MIDI
+    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, PATH_MIDI, \
+    BARS_TO_GENERATE, BAR_GENERATION_STEP_SIZE, START_TEMPERATURE
 from src.network.attention import AttentionType
-from src.network.generator import Generator, TemperatureSchedule
+from src.network.generator import Generator
 from src.network.masking import MaskType
 from src.network.optimization import TransformerLearningRateSchedule
 from src.network.training import Trainer
@@ -269,8 +269,11 @@ def train_network(network_type, run_identifier=None):
         transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{run_identifier}.h5")
 
 
-def generate(network_type, model_identifier, difficulty, lead_sequence=None):
+def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
+             primer_sequence: Sequence = None, lead_seq: Sequence = None):
     logger = get_logger(__name__)
+
+    assert not network_type == NetworkType.acmp or lead_seq is not None
 
     # Load model
     logger.info("Constructing model...")
@@ -278,60 +281,111 @@ def generate(network_type, model_identifier, difficulty, lead_sequence=None):
     transformer.build_model()
     transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
 
-    # Create starting sequence
-    seq = Sequence()
-    lead_seq = None
+    # Create sequence object
+    gen_seq = primer_sequence if primer_sequence is not None else Sequence()
 
-    if network_type == NetworkType.lead:
-        seq.add_relative_message(
-            Message.from_dict({"message_type": "time_signature", "numerator": 4, "denominator": 4}))
-    elif network_type == NetworkType.acmp:
-        lead_seq = lead_sequence
+    # TODO
+    if primer_sequence is None:
+        gen_seq.rel.messages.append(Message(message_type=MessageType.time_signature, numerator=4, denominator=4))
 
+    # Set lead sequence
+    if network_type == NetworkType.acmp:
         # TODO
         lead_seq = \
             Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/3_20220530-111731.mid", [[0]], [])[0]
 
+    # Load generator
     generator = Generator(transformer, network_type, lead_sequence=lead_seq)
 
-    schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
+    # Keep track of how many valid bars have been generated so far
+    valid_bars_generated = 0
+    amount_bars_primer_sequence = len(Sequence.split_into_bars([gen_seq])[0])
+    valid_bars_generated += amount_bars_primer_sequence
 
-    sequences, attention_weights = generator(input_sequence=seq, difficulty=difficulty, temperature=0.4)
+    # Check if last bar is filled to capacity, if not reduce number of valid bars generated
+    if (gen_seq.sequence_length() - sum(
+            bar.sequence.sequence_length() for bar in Sequence.split_into_bars([gen_seq])[0])) < 0:
+        valid_bars_generated -= 1
 
-    # Construct quantisation parameters
-    quantise_parameters = get_note_durations(1, 8)
-    quantise_parameters += get_tuplet_durations(quantise_parameters, 3, 2)
+    # Construct parameters
+    track_index = 0 if network_type == NetworkType.lead else 1
 
-    logger.info("Calculating difficulties...")
+    # Generate bars until desired number of bars has been generated
+    while valid_bars_generated < BARS_TO_GENERATE:
+        all_same_difficulty = False
+        step_size = BAR_GENERATION_STEP_SIZE
+        temperature = START_TEMPERATURE
+        iteration = 0
 
-    deviations = []
-    # Calculate difficulty deviations
-    for i, sequence in enumerate(sequences):
-        sequence.quantise(quantise_parameters)
-        sequence.quantise_note_lengths()
+        # Generate until all the new bars conform to the difficulty
+        while not all_same_difficulty:
+            logger.info(
+                f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size}, iteration {iteration}.")
+            sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
+                                                     temperature=temperature,
+                                                     bars_to_generate=valid_bars_generated + step_size)
 
-        desired_difficulty = difficulty
-        if desired_difficulty == DIFFICULTY_VALUE_SCALE - 1:
-            desired_difficulty = DIFFICULTY_VALUE_SCALE
+            # Store index, consecutive bars of best found sequence so far
+            best_sequence = (0, 0)
 
-        output_difficulties = []
+            # Check all generated sequences
+            for i, sequence in enumerate(sequences):
+                # Quantise sequence
+                sequence.quantise()
+                sequence.quantise_note_lengths()
 
-        bars = Sequence.split_into_bars([sequence])
-        for bar in bars[0]:
-            output_difficulties.append(convert_difficulty(bar.difficulty()))
+                # Get difficulties of generated bars
+                output_difficulties = []
 
-        deviation = _deviation(output_difficulties, desired_difficulty)
-        deviations.append((sequence, deviation))
+                bars = Sequence.split_into_bars([sequence])
+                new_bars = bars[track_index][valid_bars_generated:]
+                new_bars = new_bars[:step_size]
 
-    deviations = sorted(deviations, key=itemgetter(1))
-    logger.info(f"Deviations: {deviations}")
-    sequence = deviations[0][0]
+                for bar in new_bars:
+                    output_difficulties.append(convert_difficulty(bar.difficulty()))
+
+                if not all(difficulty - iteration <= dif <= difficulty for dif in output_difficulties):
+                    logger.info(
+                        f"Part of sequence {i:02d} had difficulties {output_difficulties} instead of {difficulty}.")
+
+                    consecutive_good_bars = 0
+                    for output_difficulty in output_difficulties:
+                        if output_difficulty == difficulty:
+                            consecutive_good_bars += 1
+                        else:
+                            break
+
+                    if consecutive_good_bars > best_sequence[1]:
+                        best_sequence = (i, consecutive_good_bars)
+                        logger.info(f"Currently best sequence with {consecutive_good_bars} matching consecutive bars.")
+                else:
+                    logger.info(f"Part of sequence {i:02d} had difficulties {output_difficulties}.")
+                    valid_bars_generated += step_size
+
+                    gen_part = Sequence.split_into_bars([sequence])[track_index][:valid_bars_generated]
+                    gen_seq = Bar.to_sequence(gen_part)
+
+                    all_same_difficulty = True
+                    break
+
+            if best_sequence[1] > 0:
+                # TODO Possibly use best result found so far
+                pass
+
+            # Adjust step size, temperature, iteration
+            if step_size % 2 == 0:
+                step_size = int(step_size / 2)
+            temperature *= 1.25
+            iteration += 1
 
     logger.info(f"Saving generated sequence...")
 
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_path = f"{PATH_MIDI}/{network_type.value}/{difficulty}_{current_time}.mid"
-    sequence.save(output_path)
+    output_path = f"{PATH_MIDI}/{network_type.value}/{current_time}_{difficulty}.mid"
+    gen_seq.save(output_path)
+
+    # Backlog
+    # schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
 
 
 def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
