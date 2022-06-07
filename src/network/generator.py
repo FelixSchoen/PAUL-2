@@ -70,8 +70,6 @@ class Generator(tf.Module):
         else:
             raise NotImplementedError
 
-        logger.info("Starting generation process.")
-
         # TODO Remove
         time_tracker = 0
 

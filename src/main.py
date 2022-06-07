@@ -1,11 +1,14 @@
 import argparse
 
+from sCoda import Sequence
+
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
 from src.network.paul import train_network, generate, store_checkpoint
 from src.preprocessing.preprocessing import store_records, load_midi
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
+from src.util.util import get_prj_root
 
 
 def main():
@@ -59,8 +62,13 @@ def main():
         elif args.track == "acmp":
             logger.info(f"Generating acmp track with difficulty {args.difficulty}...")
 
+            # TODO
+            lead_seq = \
+            Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/20220606-163834_4.mid", [[0]], [0])[
+                0]
+
             generate(network_type=NetworkType.acmp, model_identifier=args.model_identifier,
-                     difficulty=args.difficulty - 1)
+                     difficulty=args.difficulty - 1, lead_seq=lead_seq)
 
 
 def parse_arguments():

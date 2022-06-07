@@ -69,12 +69,12 @@ def get_network_objects(network_type, *, strategy=None, optimizer=None, train_lo
                                   d_model=d_model,
                                   num_heads=num_heads,
                                   dff=dff,
-                                  input_vocab_sizes=[INPUT_VOCAB_SIZE_MLD, INPUT_VOCAB_SIZE_DIF],
+                                  input_vocab_sizes=[INPUT_VOCAB_SIZE_DIF, INPUT_VOCAB_SIZE_MLD],
                                   target_vocab_size=ACMP_OUTPUT_VOCAB_SIZE,
                                   num_encoders=2,
-                                  mask_types=[[MaskType.padding],
-                                              [MaskType.singleout],
-                                              [MaskType.lookahead, MaskType.padding, MaskType.singleout]],
+                                  mask_types=[[MaskType.singleout],
+                                              [MaskType.padding],
+                                              [MaskType.lookahead, MaskType.singleout, MaskType.padding, ]],
                                   attention_types=[[AttentionType.absolute],
                                                    [AttentionType.absolute],
                                                    [AttentionType.self_relative, AttentionType.absolute,
@@ -284,15 +284,9 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
     # Create sequence object
     gen_seq = primer_sequence if primer_sequence is not None else Sequence()
 
-    # TODO
+    # Start with 4/4 time signature if not provided
     if primer_sequence is None:
         gen_seq.rel.messages.append(Message(message_type=MessageType.time_signature, numerator=4, denominator=4))
-
-    # Set lead sequence
-    if network_type == NetworkType.acmp:
-        # TODO
-        lead_seq = \
-            Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/3_20220530-111731.mid", [[0]], [])[0]
 
     # Load generator
     generator = Generator(transformer, network_type, lead_sequence=lead_seq)
@@ -307,26 +301,25 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
             bar.sequence.sequence_length() for bar in Sequence.split_into_bars([gen_seq])[0])) < 0:
         valid_bars_generated -= 1
 
-    # Construct parameters
-    track_index = 0 if network_type == NetworkType.lead else 1
+    max_discrepancy = difficulty
 
     # Generate bars until desired number of bars has been generated
     while valid_bars_generated < BARS_TO_GENERATE:
         all_same_difficulty = False
-        step_size = BAR_GENERATION_STEP_SIZE
+        step_size = min(BAR_GENERATION_STEP_SIZE, BARS_TO_GENERATE - valid_bars_generated)
         temperature = START_TEMPERATURE
         iteration = 0
 
         # Generate until all the new bars conform to the difficulty
         while not all_same_difficulty:
             logger.info(
-                f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size}, iteration {iteration}.")
+                f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size} of difficulty {difficulty}, iteration {iteration + 1}.")
             sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
                                                      temperature=temperature,
                                                      bars_to_generate=valid_bars_generated + step_size)
 
             # Store index, consecutive bars of best found sequence so far
-            best_sequence = (0, 0)
+            best_sequence = (-1, 0)
 
             # Check all generated sequences
             for i, sequence in enumerate(sequences):
@@ -337,40 +330,36 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
                 # Get difficulties of generated bars
                 output_difficulties = []
 
+                # Obtain newly generated bars
                 bars = Sequence.split_into_bars([sequence])
-                new_bars = bars[track_index][valid_bars_generated:]
+                new_bars = bars[0][valid_bars_generated:]
                 new_bars = new_bars[:step_size]
 
+                # Calculate difficulties of new bars
                 for bar in new_bars:
                     output_difficulties.append(convert_difficulty(bar.difficulty()))
 
-                if not all(difficulty - iteration <= dif <= difficulty for dif in output_difficulties):
+                # Calculate how many consecutive bar fall into valid range of difficulties
+                consecutive_good_bars = 0
+                for output_difficulty in output_difficulties:
+                    if difficulty - max_discrepancy <= output_difficulty <= difficulty + max_discrepancy:
+                        consecutive_good_bars += 1
+                    else:
+                        break
+
+                if consecutive_good_bars > best_sequence[1]:
+                    best_sequence = (i, consecutive_good_bars)
                     logger.info(
-                        f"Part of sequence {i:02d} had difficulties {output_difficulties} instead of {difficulty}.")
+                        f"Found better sequence with {consecutive_good_bars} bar(s) and difficulties {output_difficulties}.")
 
-                    consecutive_good_bars = 0
-                    for output_difficulty in output_difficulties:
-                        if output_difficulty == difficulty:
-                            consecutive_good_bars += 1
-                        else:
-                            break
+            if best_sequence[0] > -1:
+                valid_bars_generated += best_sequence[1]
 
-                    if consecutive_good_bars > best_sequence[1]:
-                        best_sequence = (i, consecutive_good_bars)
-                        logger.info(f"Currently best sequence with {consecutive_good_bars} matching consecutive bars.")
-                else:
-                    logger.info(f"Part of sequence {i:02d} had difficulties {output_difficulties}.")
-                    valid_bars_generated += step_size
+                gen_part = Sequence.split_into_bars([sequences[best_sequence[0]]])[0][:valid_bars_generated]
+                gen_seq = Bar.to_sequence(gen_part)
 
-                    gen_part = Sequence.split_into_bars([sequence])[track_index][:valid_bars_generated]
-                    gen_seq = Bar.to_sequence(gen_part)
-
-                    all_same_difficulty = True
-                    break
-
-            if best_sequence[1] > 0:
-                # TODO Possibly use best result found so far
-                pass
+                all_same_difficulty = True
+                break
 
             # Adjust step size, temperature, iteration
             if step_size % 2 == 0:
@@ -436,7 +425,7 @@ def _load_data(network_type, batch):
         inputs = [lead_dif]
         target = lead_seq
     elif network_type == NetworkType.acmp:
-        inputs = [lead_seq, acmp_dif]
+        inputs = [acmp_dif, lead_seq]
         target = acmp_seq
     else:
         raise NotImplementedError

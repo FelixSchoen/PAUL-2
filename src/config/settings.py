@@ -81,7 +81,7 @@ EPOCHS = 10
 # Dropout rate applied after some operations
 SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
-SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
+SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 48, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 512, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
 
 # ==================
@@ -93,5 +93,5 @@ OUTPUT_DIMENSION = 16
 # The amount of consecutive bars to generate
 BARS_TO_GENERATE = 4
 # The initial amount of consecutive bars to generate, before checking if they all conform to the same difficulty
-BAR_GENERATION_STEP_SIZE = 1
-START_TEMPERATURE = 0.5
+BAR_GENERATION_STEP_SIZE = 2
+START_TEMPERATURE = 0.4
