@@ -4,14 +4,15 @@ import tensorflow as tf
 
 
 class TransformerLearningRateSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    def __init__(self, d_model, warmup_steps=4000):
+    def __init__(self, d_model, warmup_steps=4000, multiplier=1.3):
         super(TransformerLearningRateSchedule, self).__init__()
 
         self.d_model = tf.cast(d_model, tf.float32)
         self.warmup_steps = warmup_steps
+        self.multiplier = multiplier
 
     def __call__(self, step):
-        arg1 = tf.math.rsqrt(step)
+        arg1 = tf.math.rsqrt(step * self.multiplier)
         arg2 = step * (self.warmup_steps ** -1.5)
 
         return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)

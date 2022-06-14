@@ -86,7 +86,7 @@ def test_prediction():
 
 
 def test_load_seq():
-    lead_seq = Sequence.sequences_from_midi_file("resources/beethoven_027-2_m3_4.mid", [[0]], [])[0]
+    lead_seq = Sequence.from_midi_file("resources/beethoven_027-2_m3_4.mid", [[0]], [])[0]
     print(lead_seq)
     for msg in lead_seq.rel.messages:
         print(msg)
@@ -107,3 +107,26 @@ def test_data_shape():
     print(c)
     print(len(a))
     print(len(b))
+
+
+def test_own_embedding():
+    max_len = 512
+    seq_len = 20
+
+    pre = [-1 * max_len + 1 for _ in range(seq_len - max_len)]
+    post = np.arange(-1 * max_len + 1, 1)
+    val = np.concatenate((pre, post))
+
+    print(val)
+
+
+def test_modify_iteration():
+    numbers = list(range(0, 100))
+
+    for i in numbers:
+        print(f"Iterating over {i}")
+        print(numbers)
+        if i % 2 == 0:
+            numbers.remove(i)
+
+    print(numbers)

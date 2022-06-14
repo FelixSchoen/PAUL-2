@@ -170,12 +170,15 @@ def test_transformer():
 
 
 def test_learning_rate():
-    D_MODEL = 128
+    D_MODEL = 256
     temp_learning_rate_schedule = TransformerLearningRateSchedule(D_MODEL)
 
     plt.plot(temp_learning_rate_schedule(tf.range(40000, dtype=tf.float32)))
     plt.ylabel('Learning Rate')
     plt.xlabel('Train Step')
+    plt.xlim([0, 40000])
+    plt.ylim([0, 0.001])
+    plt.show()
 
 
 def test_skew():
@@ -320,12 +323,12 @@ def _get_demo_dataset():
     def make_batches(ds):
         return (
             ds
-                .cache()
-                .shuffle(BUFFER_SIZE)
-                .batch(BATCH_SIZE)
-                .map(tokenize_pairs, num_parallel_calls=tf.data.AUTOTUNE)
-                .filter(filter_max_tokens)
-                .prefetch(tf.data.AUTOTUNE))
+            .cache()
+            .shuffle(BUFFER_SIZE)
+            .batch(BATCH_SIZE)
+            .map(tokenize_pairs, num_parallel_calls=tf.data.AUTOTUNE)
+            .filter(filter_max_tokens)
+            .prefetch(tf.data.AUTOTUNE))
 
     train_batches = make_batches(train_examples)
     val_batches = make_batches(val_examples)

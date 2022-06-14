@@ -5,7 +5,7 @@ from sCoda import Sequence
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
 from src.network.paul import train_network, generate, store_checkpoint
-from src.preprocessing.preprocessing import store_records, load_midi
+from src.preprocessing.preprocessing import store_records, load_midi, clean_midi
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 from src.util.util import get_prj_root
@@ -22,11 +22,17 @@ def main():
     if args.command == "preprocess":
         logger.info("Preprocessing MIDI files...")
 
+        if args.clean:
+            logger.info("Cleaning MIDI files...")
+
+            clean_midi(DATA_MIDI_INPUT_PATH)
+            return
+
         if args.skip_midi:
             logger.info("Skipping loading of MIDI files...")
         else:
             logger.info("Loading MIDI files...")
-            load_midi(f"{DATA_MIDI_INPUT_PATH}")
+            load_midi(DATA_MIDI_INPUT_PATH)
 
         logger.info("Storing TFRecords...")
         store_records(input_dir=DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, output_dir=DATA_TRAIN_OUTPUT_FILE_PATH)
@@ -64,7 +70,7 @@ def main():
 
             # TODO
             lead_seq = \
-            Sequence.sequences_from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/20220606-163834_4.mid", [[0]], [0])[
+            Sequence.from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/20220606-163834_4.mid", [[0]], [0])[
                 0]
 
             generate(network_type=NetworkType.acmp, model_identifier=args.model_identifier,
@@ -81,6 +87,8 @@ def parse_arguments():
     parser_train.set_defaults(command="preprocess")
     parser_train.add_argument("--skip_midi", action="store_true",
                               help="Skips processing and storing of MIDI files.")
+    parser_train.add_argument("--clean", action="store_true",
+                              help="Removes all invalid files from the dataset.")
 
     # Train Command
     parser_train = subparsers.add_parser("train", aliases=["t"], help="Trains the networks.")

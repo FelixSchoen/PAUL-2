@@ -17,10 +17,171 @@ from tensorflow import Tensor
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, START_TOKEN, STOP_TOKEN, D_TYPE, TRAIN_VAL_SPLIT, \
-    SHUFFLE_SEED, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_BARS_VAL_OUTPUT_FOLDER_PATH
+    SHUFFLE_SEED, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_BARS_VAL_OUTPUT_FOLDER_PATH, TRACK_NAME_SIGN, TRACK_NAMES, \
+    VALID_TRACK_NAMES, TRACK_NAME_LEAD, TRACK_NAME_ACMP, TRACK_NAME_UNKN, TRACK_NAME_META, MAX_PERCENTAGE_EMPTY_BARS
 from src.exception.exceptions import UnexpectedValueException
+from src.util.enumerations import NameSearchType
 from src.util.logging import get_logger
 from src.util.util import flatten, pickle_save, pickle_load, convert_difficulty
+
+
+# ==================
+# === Clean MIDI ===
+# ==================
+
+def clean_midi(input_dir: str) -> None:
+    logger = get_logger(__name__)
+
+    file_paths = []
+
+    # Handle all MIDI files in the given directory and subdirectories
+    for dir_path, _, filenames in os.walk(input_dir):
+        for file_name in [f for f in filenames if f.endswith(".mid")]:
+            file_paths.append((os.path.join(dir_path, file_name), file_name))
+
+    overall_files = len(file_paths)
+    deleted_files = 0
+
+    for i, file_tuple in enumerate(file_paths):
+
+        file_path, file_name = file_tuple
+
+        delete_file = clean_midi_handle_and_modify(file_path)
+
+        if delete_file:
+            deleted_files += 1
+            os.remove(file_path)
+            logger.info(f"Deleting file {file_path}...")
+
+    logger.info(f"Total amount of files pre operation: {overall_files}")
+    logger.info(f"Deleted files: {deleted_files}")
+
+
+def clean_midi_handle_and_modify(file_path):
+    try:
+        midi_file = mido.MidiFile(file_path)
+
+        need_to_save = False
+
+        # Remove files with less than two tracks
+        if len(midi_file.tracks) < 2:
+            return True
+
+        # Remove files with less than two tracks containing notes
+        tracks_with_notes = []
+        for i, track in enumerate(midi_file.tracks):
+            for msg in track:
+                if msg.type == "note_on":
+                    tracks_with_notes.append(i)
+                    break
+        if len(tracks_with_notes) < 2:
+            return True
+
+        # Rename signature track
+        tracks_with_signatures = []
+        for i, track in enumerate(midi_file.tracks):
+            for msg in track:
+                if msg.type == "time_signature" or msg.type == "key_signature":
+                    tracks_with_signatures.append(i)
+                    break
+        for t in tracks_with_signatures:
+            if t not in tracks_with_notes and midi_file.tracks[t].name != TRACK_NAME_SIGN:
+                midi_file.tracks[t].name = TRACK_NAME_SIGN
+                need_to_save = True
+
+        # Rename tracks
+        for t, track in enumerate(midi_file.tracks):
+            valid_track_name = False
+
+            for name_pair in VALID_TRACK_NAMES:
+                is_word = name_pair[0] == NameSearchType.word
+                name_lead = name_pair[1]
+                name_acmp = name_pair[2]
+
+                if track.name in TRACK_NAMES:
+                    valid_track_name = True
+                    continue
+                elif t not in tracks_with_notes:
+                    track.name = TRACK_NAME_META
+                    need_to_save = True
+                    valid_track_name = True
+                    continue
+                elif _load_midi_find_phrase(name_lead, track.name, find_word_only=is_word) is not None:
+                    track.name = TRACK_NAME_LEAD
+                    need_to_save = True
+                    valid_track_name = True
+                    continue
+                elif _load_midi_find_phrase(name_acmp, track.name, find_word_only=is_word) is not None:
+                    track.name = TRACK_NAME_ACMP
+                    need_to_save = True
+                    valid_track_name = True
+                    continue
+
+            if not valid_track_name:
+                track.name = TRACK_NAME_UNKN
+                need_to_save = True
+
+        # If file has named tracks, remove all non-named tracks
+        tracks_to_remove = []
+        if any(track.name in [TRACK_NAME_LEAD, TRACK_NAME_ACMP] for track in midi_file.tracks):
+            for t, track in enumerate(midi_file.tracks):
+                if track.name not in [TRACK_NAME_LEAD, TRACK_NAME_ACMP, TRACK_NAME_SIGN, TRACK_NAME_META]:
+                    tracks_to_remove.append(t)
+        for i, t in enumerate(tracks_to_remove):
+            midi_file.tracks.pop(t - i)
+            need_to_save = True
+
+        # Remove files with only one type of named tracks
+        if any(track.name in [TRACK_NAME_LEAD, TRACK_NAME_ACMP] for track in midi_file.tracks):
+            if len([track.name for track in midi_file.tracks if track.name == TRACK_NAME_LEAD]) == 0 or \
+                    len([track.name for track in midi_file.tracks if track.name == TRACK_NAME_ACMP]) == 0:
+                return True
+
+        # Remove files with unknown tracks where amount of tracks with notes is larger than 2
+        tracks_unknown = []
+        if any(track.name in [TRACK_NAME_UNKN] for track in midi_file.tracks):
+            for t, track in enumerate(midi_file.tracks):
+                if track.name in [TRACK_NAME_UNKN]:
+                    tracks_unknown.append(t)
+        if len(tracks_unknown) > 2:
+            return True
+
+        # Repeat removal of files with less than two tracks
+        tracks_with_notes = []
+        for i, track in enumerate(midi_file.tracks):
+            for msg in track:
+                if msg.type == "note_on":
+                    tracks_with_notes.append(i)
+                    break
+        if len(tracks_with_notes) < 2:
+            return True
+
+        if need_to_save:
+            midi_file.save(file_path)
+
+        sequences = _load_midi_file(file_path)
+        composition = Composition.from_sequences(sequences)
+
+        # Remove pieces with too many empty bars
+        for track in composition.tracks:
+            amount_bars = len(track.bars)
+            empty_bars = 0
+            for bar in track.bars:
+                if bar.is_empty():
+                    empty_bars += 1
+                if empty_bars > amount_bars * MAX_PERCENTAGE_EMPTY_BARS:
+                    return True
+
+    except mido.midifiles.meta.KeySignatureError:
+        return True
+    except EOFError:
+        return True
+    except AssertionError:
+        return True
+    except IOError:
+        return True
+
+    return False
 
 
 # =================
@@ -57,21 +218,29 @@ def _load_midi_process_file_paths(file_paths, output_path):
     logger = get_logger(__name__)
     pool = Pool(multiprocessing.cpu_count() - 1)
 
-    for file_tuple in file_paths:
+    for i, file_tuple in enumerate(file_paths):
         file_path, file_name = file_tuple
+        file_output_path = f"{output_path}/{i:04d}_{file_name[:-4]}.zip"
 
-        if os.path.exists(f"{output_path}/{file_name[:-4]}.zip"):
-            logger.info(f"Skipping {file_name}...")
+        if os.path.exists(file_output_path):
+            logger.info(f"Skipping already existing file {file_name}...")
             continue
 
-        logger.info(f"Loading {file_name}...")
+        logger.info(f"Loading {file_path}...")
         compositions = flatten(list(pool.starmap(_load_midi_load_composition_and_scale, zip([file_path]))))
+
+        if len(compositions) == 0:
+            logger.info(f"Skipping invalid file {file_name}...")
+            continue
 
         logger.info("Loading bars...")
         bar_tuples = flatten(list(pool.starmap(_load_midi_extract_bars, zip(compositions))))
 
         logger.info("Calculating difficulty...")
-        bar_tuples = list(pool.starmap(_load_midi_calculate_difficulty, zip(bar_tuples)))
+        try:
+            bar_tuples = list(pool.starmap(_load_midi_calculate_difficulty, zip(bar_tuples)))
+        except KeyError:
+            continue
 
         # Shuffle bars
         random.Random(SHUFFLE_SEED).shuffle(bar_tuples)
@@ -79,9 +248,8 @@ def _load_midi_process_file_paths(file_paths, output_path):
         logger.info("Transposing bars...")
         bars_transposed = flatten(list(pool.starmap(_load_midi_transpose_bars, zip(bar_tuples))))
 
-        logger.info("Storing bars...")
-        zip_file_path = f"{output_path}/{file_name[:-4]}.zip"
-        pickle_save(bars_transposed, zip_file_path)
+        logger.info(f"Storing {len(bars_transposed)} bar tuples...")
+        pickle_save(bars_transposed, file_output_path)
 
         gc.collect()
 
@@ -95,27 +263,11 @@ def _load_midi_load_composition_and_scale(file_path: str) -> [Composition]:
     Returns: A list of scaled compositions
 
     """
-    lead_tracks = []
-    acmp_tracks = []
-    meta_tracks = [0]
-
-    # Open MIDI file
-    midi_file = mido.MidiFile(file_path)
-
-    # Parse track titles
-    for t, track in enumerate(midi_file.tracks):
-        if _load_midi_find_word("right", track.name) is not None:
-            lead_tracks.append(t)
-        elif _load_midi_find_word("left", track.name) is not None:
-            acmp_tracks.append(t)
-        elif _load_midi_find_word("pedal", track.name) is not None:
-            meta_tracks.append(t)
-
     compositions = []
-    scale_factors = [0.5, 1, 2]
+    scale_factors = [1, 2]
 
     # Load sequences from file
-    sequences = Sequence.sequences_from_midi_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
+    sequences = _load_midi_file(file_path)
 
     # Scale sequences by given factors
     for scale_factor in scale_factors:
@@ -135,7 +287,8 @@ def _load_midi_load_composition_and_scale(file_path: str) -> [Composition]:
             scaled_sequences.append(scaled_sequence)
 
         # Create composition from scaled sequences
-        compositions.append(Composition.from_sequences(scaled_sequences))
+        composition = Composition.from_sequences(scaled_sequences)
+        compositions.append(composition)
 
     return compositions
 
@@ -152,6 +305,7 @@ def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
     """
     lead_track = composition.tracks[0]
     acmp_track = composition.tracks[1]
+    bars = list(zip(lead_track.bars, acmp_track.bars))
 
     # Check that we start with the same number of bars
     assert len(lead_track.bars) == len(acmp_track.bars)
@@ -160,44 +314,36 @@ def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
     lead_chunked = []
     acmp_chunked = []
 
-    lead_current = []
-    acmp_current = []
+    stride = int(CONSECUTIVE_BAR_MAX_LENGTH)
 
-    remaining = CONSECUTIVE_BAR_MAX_LENGTH
-    for lead_bar, acmp_bar in zip(lead_track.bars, acmp_track.bars):
-        # Check if time signature of bar is valid
-        signature = (int(lead_bar.time_signature_numerator), int(lead_bar.time_signature_denominator))
+    for i in range(0, len(bars), stride):
+        lead_current = []
+        acmp_current = []
 
-        # Split at non-valid time signature
-        if signature not in VALID_TIME_SIGNATURES:
-            remaining = CONSECUTIVE_BAR_MAX_LENGTH
+        remaining = CONSECUTIVE_BAR_MAX_LENGTH
 
-            if len(lead_current) > 0:
-                lead_chunked.append(lead_current)
-                acmp_chunked.append(acmp_current)
+        j = i
+        while j < len(bars) and remaining > 0:
+            lead_bar, acmp_bar = bars[j]
 
-            lead_current = []
-            acmp_current = []
+            # Check if time signature of bar is valid
+            signature = (int(lead_bar.time_signature_numerator), int(lead_bar.time_signature_denominator))
 
-            continue
+            # Split at non-valid time signature
+            if signature not in VALID_TIME_SIGNATURES:
+                break
 
-        lead_current.append(lead_bar)
-        acmp_current.append(acmp_bar)
-        remaining -= 1
+            lead_current.append(lead_bar)
+            acmp_current.append(acmp_bar)
 
-        # Maximum length reached
-        if remaining == 0:
-            remaining = CONSECUTIVE_BAR_MAX_LENGTH
+            j += 1
+            remaining -= 1
 
+        if len(lead_current) == CONSECUTIVE_BAR_MAX_LENGTH and len(acmp_current) == CONSECUTIVE_BAR_MAX_LENGTH and (
+                len([bar for bar in lead_current if bar.is_empty()]) <= CONSECUTIVE_BAR_MAX_LENGTH / 2 and
+                len([bar for bar in acmp_current if bar.is_empty()]) <= CONSECUTIVE_BAR_MAX_LENGTH / 2):
             lead_chunked.append(lead_current)
             acmp_chunked.append(acmp_current)
-
-            lead_current = []
-            acmp_current = []
-
-    if len(lead_current) > 0:
-        lead_chunked.append(lead_current)
-        acmp_chunked.append(acmp_current)
 
     # Zip the chunked bars
     zipped_chunks = list(zip(lead_chunked, acmp_chunked))
@@ -264,7 +410,7 @@ def _load_midi_transpose_bars(base_bars: ([Bar], [Bar])) -> [([Bar], [Bar])]:
     return transposed_bars
 
 
-def _load_midi_find_word(word: str, sentence: str) -> re.Match:
+def _load_midi_find_phrase(word: str, sentence: str, find_word_only=True) -> re.Match:
     """ Tries to find a word, not just a sequence of characters, in the given sentence.
 
     Args:
@@ -274,7 +420,10 @@ def _load_midi_find_word(word: str, sentence: str) -> re.Match:
     Returns: A `match` object
 
     """
-    return re.compile(fr"\b({word})\b", flags=re.IGNORECASE).search(sentence)
+    if find_word_only:
+        return re.compile(fr"\b({word})\b", flags=re.IGNORECASE).search(sentence)
+    else:
+        return re.compile(fr"{word}", flags=re.IGNORECASE).search(sentence)
 
 
 # =====================
@@ -488,6 +637,43 @@ def load_records(input_path) -> tf.data.Dataset:
              ])
 
     return raw_dataset.map(_parse_function)
+
+
+# ===============
+# === Utility ===
+# ===============
+
+
+def _load_midi_file(file_path):
+    lead_tracks = []
+    acmp_tracks = []
+    meta_tracks = []
+
+    # Open MIDI file
+    midi_file = mido.MidiFile(file_path)
+
+    for t, track in enumerate(midi_file.tracks):
+        if track.name == TRACK_NAME_SIGN:
+            meta_tracks.append(t)
+        elif track.name == TRACK_NAME_LEAD:
+            lead_tracks.append(t)
+        elif track.name == TRACK_NAME_ACMP:
+            acmp_tracks.append(t)
+        elif track.name == TRACK_NAME_UNKN:
+            if len(lead_tracks) == 0:
+                lead_tracks.append(t)
+            elif len(acmp_tracks) == 0:
+                acmp_tracks.append(t)
+            else:
+                assert False, "Too many unknown tracks"
+        elif track.name == TRACK_NAME_META:
+            pass
+        else:
+            assert False, "Unexpected track name"
+
+    sequences = Sequence.from_midi_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
+
+    return sequences
 
 
 # ====================
