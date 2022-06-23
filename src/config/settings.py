@@ -86,6 +86,8 @@ VALID_TRACK_NAMES = [(NameSearchType.phrase, "right", "left"),
 
 # If a piece has more empty bars it is deleted from the dataset
 MAX_PERCENTAGE_EMPTY_BARS = 0.4
+# Whether unknown tracks should be used
+ACCEPT_UNKNOWN_TRACKS = False
 
 # ==================
 # === Parameters ===
@@ -95,7 +97,7 @@ TRAIN_VAL_SPLIT = 0.95
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
-EPOCHS = 10
+EPOCHS = 4
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
@@ -103,9 +105,9 @@ EPOCHS = 10
 # Dimension of the model
 # Dimension of the feed-forward network
 # Dropout rate applied after some operations
-SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
+SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 1024,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
-SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 48, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 512,
+SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
 
 # ==================

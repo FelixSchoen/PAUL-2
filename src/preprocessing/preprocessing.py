@@ -13,12 +13,14 @@ import numpy as np
 import tensorflow as tf
 from sCoda import Composition, Bar, Sequence
 from sCoda.elements.message import MessageType
+from sCoda.exception.exceptions import BarException, TrackException
 from tensorflow import Tensor
 
 from src.config.settings import SEQUENCE_MAX_LENGTH, CONSECUTIVE_BAR_MAX_LENGTH, \
     VALID_TIME_SIGNATURES, START_TOKEN, STOP_TOKEN, D_TYPE, TRAIN_VAL_SPLIT, \
     SHUFFLE_SEED, DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_BARS_VAL_OUTPUT_FOLDER_PATH, TRACK_NAME_SIGN, TRACK_NAMES, \
-    VALID_TRACK_NAMES, TRACK_NAME_LEAD, TRACK_NAME_ACMP, TRACK_NAME_UNKN, TRACK_NAME_META, MAX_PERCENTAGE_EMPTY_BARS
+    VALID_TRACK_NAMES, TRACK_NAME_LEAD, TRACK_NAME_ACMP, TRACK_NAME_UNKN, TRACK_NAME_META, MAX_PERCENTAGE_EMPTY_BARS, \
+    ACCEPT_UNKNOWN_TRACKS
 from src.exception.exceptions import UnexpectedValueException
 from src.util.enumerations import NameSearchType
 from src.util.logging import get_logger
@@ -160,6 +162,10 @@ def clean_midi_handle_and_modify(file_path):
             midi_file.save(file_path)
 
         sequences = _load_midi_file(file_path)
+
+        if sequences is None:
+            return True
+
         composition = Composition.from_sequences(sequences)
 
         # Remove pieces with too many empty bars
@@ -176,9 +182,11 @@ def clean_midi_handle_and_modify(file_path):
         return True
     except EOFError:
         return True
-    except AssertionError:
-        return True
     except IOError:
+        return True
+    except BarException:
+        return True
+    except TrackException:
         return True
 
     return False
@@ -269,6 +277,9 @@ def _load_midi_load_composition_and_scale(file_path: str) -> [Composition]:
     # Load sequences from file
     sequences = _load_midi_file(file_path)
 
+    if sequences is None:
+        return compositions
+
     # Scale sequences by given factors
     for scale_factor in scale_factors:
         scaled_sequences = []
@@ -340,8 +351,8 @@ def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
             remaining -= 1
 
         if len(lead_current) == CONSECUTIVE_BAR_MAX_LENGTH and len(acmp_current) == CONSECUTIVE_BAR_MAX_LENGTH and (
-                len([bar for bar in lead_current if bar.is_empty()]) <= CONSECUTIVE_BAR_MAX_LENGTH / 2 and
-                len([bar for bar in acmp_current if bar.is_empty()]) <= CONSECUTIVE_BAR_MAX_LENGTH / 2):
+                len([bar for bar in lead_current if bar.is_empty()]) == 0 and
+                len([bar for bar in acmp_current if bar.is_empty()]) == 0):
             lead_chunked.append(lead_current)
             acmp_chunked.append(acmp_current)
 
@@ -660,16 +671,22 @@ def _load_midi_file(file_path):
         elif track.name == TRACK_NAME_ACMP:
             acmp_tracks.append(t)
         elif track.name == TRACK_NAME_UNKN:
-            if len(lead_tracks) == 0:
-                lead_tracks.append(t)
-            elif len(acmp_tracks) == 0:
-                acmp_tracks.append(t)
+            if ACCEPT_UNKNOWN_TRACKS:
+                if len(lead_tracks) == 0:
+                    lead_tracks.append(t)
+                elif len(acmp_tracks) == 0:
+                    acmp_tracks.append(t)
+                else:
+                    assert False, "Too many unknown tracks"
             else:
-                assert False, "Too many unknown tracks"
+                pass
         elif track.name == TRACK_NAME_META:
             pass
         else:
             assert False, "Unexpected track name"
+
+    if len(lead_tracks) == 0 or len(acmp_tracks) == 0:
+        return None
 
     sequences = Sequence.from_midi_file(file_path, [lead_tracks, acmp_tracks], meta_tracks)
 

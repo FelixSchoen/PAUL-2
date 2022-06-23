@@ -4,6 +4,8 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/VirtualEnv" />
       <excludeFolder url="file://$MODULE_DIR$/data/dataset" />
+      <excludeFolder url="file://$MODULE_DIR$/analysis/bars" />
+      <excludeFolder url="file://$MODULE_DIR$/out/bars" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
