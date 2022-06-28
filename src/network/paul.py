@@ -2,6 +2,7 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime
+from math import floor
 
 import tensorflow as tf
 from sCoda import Sequence, Bar, Message
@@ -12,7 +13,8 @@ from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, PATH_MIDI, \
-    BARS_TO_GENERATE, BAR_GENERATION_STEP_SIZE, START_TEMPERATURE
+    BARS_TO_GENERATE, BAR_GENERATION_STEP_SIZE, START_TEMPERATURE, VAL_PER_BATCHES, MAX_CHECKPOINTS_TO_KEEP, \
+    MAXIMUM_NOTE_LENGTH
 from src.network.attention import AttentionType
 from src.network.generator import Generator
 from src.network.masking import MaskType
@@ -107,6 +109,7 @@ def train_network(network_type, run_identifier=None):
         settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
         d_model = settings["D_MODEL"]
         batch_size = settings["BATCH_SIZE"]
+        val_per_epoch = batch_size * VAL_PER_BATCHES
 
         logical_gpus = tf.config.list_logical_devices("GPU")
         logger.info(f"Running with {len(logical_gpus)} virtual GPUs...")
@@ -129,6 +132,12 @@ def train_network(network_type, run_identifier=None):
 
         amount_batches = amount_train_batches + amount_val_batches
         logger.info(f"Overall dataset consists of {amount_batches} batches.")
+
+        amount_train_samples = batch_size * amount_train_batches
+        logger.info(f"Train dataset consists of {amount_train_samples} samples.")
+
+        amount_val_samples = batch_size * amount_val_batches
+        logger.info(f"Validation dataset consists of {amount_val_samples} samples.")
 
         logger.info("Constructing model...")
 
@@ -160,17 +169,22 @@ def train_network(network_type, run_identifier=None):
         checkpoint = tf.train.Checkpoint(transformer=transformer,
                                          optimizer=optimizer)
         checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {run_identifier}"
-        checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
+        checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path,
+                                                        max_to_keep=MAX_CHECKPOINTS_TO_KEEP)
 
         # If checkpoint exists, restore it
+        completed_batches_of_epoch = 0
         if checkpoint_manager.latest_checkpoint:
-            start_epoch = tf.Variable(len(checkpoint_manager.checkpoints))
-
             checkpoint.restore(checkpoint_manager.latest_checkpoint)
-            logger.info(
-                f"Restored checkpoint for epoch {len(checkpoint_manager.checkpoints)}. "
-                f"Will start from epoch {start_epoch.numpy() + 1}. "
-                f"{optimizer.iterations.numpy()} iterations already completed.")
+
+            completed_epochs = floor(optimizer.iterations.numpy() / amount_train_batches)
+            completed_batches_of_epoch = optimizer.iterations.numpy() - (amount_train_batches * completed_epochs)
+
+            start_epoch = tf.Variable(completed_epochs)
+
+            logger.info(f"Restored checkpoint with {completed_epochs} epochs completed. "
+                        f"Completed {completed_batches_of_epoch} batches of current epoch. "
+                        f"Completed {optimizer.iterations.numpy()} steps so far.")
 
             train_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/train"
             val_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/val"
@@ -211,8 +225,12 @@ def train_network(network_type, run_identifier=None):
             val_loss.reset_states()
             val_accuracy.reset_states()
 
-            # Train batches
+            # Batches
             for (batch_num, batch) in enumerate(train_distributed_ds):
+                if completed_batches_of_epoch > 0:
+                    completed_batches_of_epoch -= 1
+                    continue
+
                 # Load data
                 inputs, target = _load_data(network_type, batch)
 
@@ -227,42 +245,50 @@ def train_network(network_type, run_identifier=None):
                     tf.summary.scalar("train_loss", train_loss.result(), step=optimizer.iterations)
                     tf.summary.scalar("train_accuracy", train_accuracy.result(), step=optimizer.iterations)
 
+                # Validation step
+                if optimizer.iterations.numpy() % floor(amount_train_batches / val_per_epoch) == 0 \
+                        and optimizer.iterations.numpy() != 0:
+                    logger.info(
+                        f"[E{epoch + 1:02d}B{batch_num + 1:05d}S{optimizer.iterations.numpy():05d}]: "
+                        f"Calculating validation statistics...")
+
+                    # Validation batches
+                    for (val_batch_num, val_batch) in enumerate(val_distributed_ds):
+                        # Load data
+                        inputs, target = _load_data(network_type, val_batch)
+
+                        # Validation step
+                        if strategy is not None:
+                            trainer.distributed_val_step(inputs, target)
+                        else:
+                            trainer.val_step(inputs, target)
+
+                    step = floor(optimizer.iterations.numpy() / floor(amount_train_batches / val_per_epoch))
+
+                    # Tensorboard
+                    with val_summary_writer.as_default():
+                        tf.summary.scalar("val_loss", val_loss.result(), step=step)
+                        tf.summary.scalar("val_accuracy", val_accuracy.result(), step=step)
+
+                    # Validation Logging
+                    logger.info(
+                        f"[E{epoch + 1:02d}]: Val Loss {val_loss.result():.4f}, Val Accuracy {val_accuracy.result():.4f}. "
+                        f"Time taken: {round(time.time() - epoch_timer, 2)}s")
+
+                    # Save checkpoint
+                    checkpoint_save_path = checkpoint_manager.save(checkpoint_number=step)
+                    logger.info(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
+
                 # Logging
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
                 logger.info(
-                    f"[E{epoch + 1:02d}B{batch_num + 1:05d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
+                    f"[E{epoch + 1:02d}B{batch_num + 1:05d}S{optimizer.iterations.numpy():05d}]: "
+                    f"Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
                     f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
                 # Reset timer
                 batch_timer = time.time()
                 tf.config.experimental.reset_memory_stats("GPU:0")
-
-            logger.info(f"[E{epoch + 1:02d}]: Calculating validation statistics...")
-
-            # Validation batches
-            for (batch_num, batch) in enumerate(val_distributed_ds):
-                # Load data
-                inputs, target = _load_data(network_type, batch)
-
-                # Validation step
-                if strategy is not None:
-                    trainer.distributed_val_step(inputs, target)
-                else:
-                    trainer.val_step(inputs, target)
-
-            # Tensorboard
-            with val_summary_writer.as_default():
-                tf.summary.scalar("val_loss", val_loss.result(), step=epoch + 1)
-                tf.summary.scalar("val_accuracy", val_accuracy.result(), step=epoch + 1)
-
-            # Logging
-            logger.info(f"[E{epoch + 1:02d}]: Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
-                        f"Val Loss {val_loss.result():.4f}, Val Accuracy {val_accuracy.result():.4f}. "
-                        f"Time taken: {round(time.time() - epoch_timer, 2)}s")
-
-            # Save checkpoint
-            checkpoint_save_path = checkpoint_manager.save()
-            logger.info(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
 
         # Save model
         logger.info("Finished training process. Saving model.")
@@ -301,77 +327,89 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
             bar.sequence.sequence_length() for bar in Sequence.split_into_bars([gen_seq])[0])) < 0:
         valid_bars_generated -= 1
 
-    max_discrepancy = difficulty
+    max_discrepancy = 2
+
+    # TODO Start
+    sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
+                                             temperature=0.6,
+                                             bars_to_generate=4)
+    for i, seq in enumerate(sequences):
+        seq.cutoff(2*MAXIMUM_NOTE_LENGTH, MAXIMUM_NOTE_LENGTH)
+        seq.save(f"{get_prj_root()}/out/temp/{network_type}_{i}.mid")
+
+    # TODO End
 
     # Generate bars until desired number of bars has been generated
-    while valid_bars_generated < BARS_TO_GENERATE:
-        all_same_difficulty = False
-        step_size = min(BAR_GENERATION_STEP_SIZE, BARS_TO_GENERATE - valid_bars_generated)
-        temperature = START_TEMPERATURE
-        iteration = 0
-
-        # Generate until all the new bars conform to the difficulty
-        while not all_same_difficulty:
-            logger.info(
-                f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size} of difficulty {difficulty}, iteration {iteration + 1}.")
-            sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
-                                                     temperature=temperature,
-                                                     bars_to_generate=valid_bars_generated + step_size)
-
-            # Store index, consecutive bars of best found sequence so far
-            best_sequence = (-1, 0)
-
-            # Check all generated sequences
-            for i, sequence in enumerate(sequences):
-                # Quantise sequence
-                sequence.quantise()
-                sequence.quantise_note_lengths()
-
-                # Get difficulties of generated bars
-                output_difficulties = []
-
-                # Obtain newly generated bars
-                bars = Sequence.split_into_bars([sequence])
-                new_bars = bars[0][valid_bars_generated:]
-                new_bars = new_bars[:step_size]
-
-                # Calculate difficulties of new bars
-                for bar in new_bars:
-                    output_difficulties.append(convert_difficulty(bar.difficulty()))
-
-                # Calculate how many consecutive bar fall into valid range of difficulties
-                consecutive_good_bars = 0
-                for output_difficulty in output_difficulties:
-                    if difficulty - max_discrepancy <= output_difficulty <= difficulty + max_discrepancy:
-                        consecutive_good_bars += 1
-                    else:
-                        break
-
-                if consecutive_good_bars > best_sequence[1]:
-                    best_sequence = (i, consecutive_good_bars)
-                    logger.info(
-                        f"Found better sequence with {consecutive_good_bars} bar(s) and difficulties {output_difficulties}.")
-
-            if best_sequence[0] > -1:
-                valid_bars_generated += best_sequence[1]
-
-                gen_part = Sequence.split_into_bars([sequences[best_sequence[0]]])[0][:valid_bars_generated]
-                gen_seq = Bar.to_sequence(gen_part)
-
-                all_same_difficulty = True
-                break
-
-            # Adjust step size, temperature, iteration
-            if step_size % 2 == 0:
-                step_size = int(step_size / 2)
-            temperature *= 1.25
-            iteration += 1
-
-    logger.info(f"Saving generated sequence...")
-
-    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_path = f"{PATH_MIDI}/{network_type.value}/{current_time}_{difficulty}.mid"
-    gen_seq.save(output_path)
+    # TODO
+    # while valid_bars_generated < BARS_TO_GENERATE:
+    #     all_same_difficulty = False
+    #     step_size = min(BAR_GENERATION_STEP_SIZE, BARS_TO_GENERATE - valid_bars_generated)
+    #     temperature = START_TEMPERATURE
+    #     iteration = 0
+    #
+    #     # Generate until all the new bars conform to the difficulty
+    #     while not all_same_difficulty:
+    #         logger.info(
+    #             f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size} of difficulty {difficulty}, iteration {iteration + 1}.")
+    #         sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
+    #                                                  temperature=temperature,
+    #                                                  bars_to_generate=valid_bars_generated + step_size)
+    #
+    #         # Store index, consecutive bars of best found sequence so far
+    #         best_sequence = (-1, 0)
+    #
+    #         # Check all generated sequences
+    #         for i, sequence in enumerate(sequences):
+    #             # Quantise sequence
+    #             sequence.quantise()
+    #             sequence.quantise_note_lengths()
+    #
+    #             # Get difficulties of generated bars
+    #             output_difficulties = []
+    #
+    #             # Obtain newly generated bars
+    #             bars = Sequence.split_into_bars([sequence])
+    #             new_bars = bars[0][valid_bars_generated:]
+    #             new_bars = new_bars[:step_size]
+    #
+    #             # Calculate difficulties of new bars
+    #             for bar in new_bars:
+    #                 output_difficulties.append(convert_difficulty(bar.difficulty()))
+    #
+    #             # Calculate how many consecutive bar fall into valid range of difficulties
+    #             consecutive_good_bars = 0
+    #             for output_difficulty in output_difficulties:
+    #                 if difficulty - max_discrepancy <= output_difficulty <= difficulty + max_discrepancy:
+    #                     consecutive_good_bars += 1
+    #                 else:
+    #                     break
+    #
+    #             if consecutive_good_bars > best_sequence[1]:
+    #                 best_sequence = (i, consecutive_good_bars)
+    #                 logger.info(
+    #                     f"Found better sequence with {consecutive_good_bars} bar(s) and difficulties {output_difficulties}.")
+    #
+    #         if best_sequence[0] > -1:
+    #             valid_bars_generated += best_sequence[1]
+    #
+    #             gen_part = Sequence.split_into_bars([sequences[best_sequence[0]]])[0][:valid_bars_generated]
+    #             gen_seq = Bar.to_sequence(gen_part)
+    #
+    #             all_same_difficulty = True
+    #             break
+    #
+    #         # Adjust step size, temperature, iteration
+    #         if step_size % 2 == 0:
+    #             step_size = int(step_size / 2)
+    #         temperature *= 1.25
+    #         iteration += 1
+    #
+    # logger.info(f"Saving generated sequence...")
+    #
+    # current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # output_path = f"{PATH_MIDI}/{network_type.value}/{current_time}_{difficulty}.mid"
+    # gen_seq.save(output_path)
+    # TODO
 
     # Backlog
     # schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
@@ -395,11 +433,12 @@ def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
                                      optimizer=optimizer)
     checkpoint_path = f"{PATH_CHECKPOINT}/{network_type.value}/{network_type.value} {run_identifier}"
     checkpoint_manager = tf.train.CheckpointManager(checkpoint, checkpoint_path, max_to_keep=EPOCHS)
-    checkpoint.restore(checkpoint_manager.checkpoints[checkpoint_identifier])
+    index_of = next(i for i, v in enumerate(checkpoint_manager.checkpoints) if f"ckpt-{checkpoint_identifier}" in v)
+    checkpoint.restore(checkpoint_manager.checkpoints[index_of])
 
     transformer.save_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{run_identifier}.h5")
 
-    logger.info(f"Stored model {run_identifier} from epoch {checkpoint_identifier + 1}.")
+    logger.info(f"Stored model {run_identifier} from epoch {checkpoint_identifier}.")
 
 
 def _load_data(network_type, batch):

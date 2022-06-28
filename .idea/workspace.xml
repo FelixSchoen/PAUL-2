@@ -2,10 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b9f1f220-fe63-43a1-a011-91525046ee3e" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/Paul.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Paul.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis/analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/analysis.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/network/generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/generator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/network/paul.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/paul.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/preprocessing/preprocessing.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/preprocessing/preprocessing.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -50,7 +51,7 @@
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/Documents/Coding/Repository/BachelorsThesis&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Documents/Coding/Repository/Paul/out/temp&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
@@ -58,11 +59,12 @@
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\Documents\Coding\Repository\Paul\out\temp" />
       <recent name="D:\Documents\Coding\Repository\Paul\test\resources" />
       <recent name="D:\Documents\Coding\Repository\Paul\out\bars\analysis" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.Train - Acmp">
+  <component name="RunManager" selected="Python.Preprocess">
     <configuration name="Generate - Acmp" type="PythonConfigurationType" factoryName="Python">
       <module name="Paul" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -77,7 +79,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="generate acmp --model_identifier 20220603-120238 --difficulty 5" />
+      <option name="PARAMETERS" value="generate acmp --model_identifier 20220624-170101 --difficulty 5" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -99,7 +101,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="generate lead --model_identifier 20220606-192659 --difficulty 2" />
+      <option name="PARAMETERS" value="generate lead --model_identifier 20220625-225715 --difficulty 5" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -187,7 +189,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="store acmp --run_identifier 20220603-120238 --checkpoint_identifier 4" />
+      <option name="PARAMETERS" value="store acmp --run_identifier 20220624-170101 --checkpoint_identifier 20" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -209,7 +211,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="store lead --run_identifier 20220606-192659 --checkpoint_identifier 6" />
+      <option name="PARAMETERS" value="store lead --run_identifier 20220625-225715 --checkpoint_identifier 79" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -231,7 +233,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="train acmp --run_identifier 20220602-001618" />
+      <option name="PARAMETERS" value="train acmp --run_identifier 20220623-092929" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -275,7 +277,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="train lead --run_identifier 20220620-191500" />
+      <option name="PARAMETERS" value="train lead --run_identifier 20220625-225715" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -493,7 +495,17 @@
       <workItem from="1655800567322" duration="7163000" />
       <workItem from="1655828625773" duration="2016000" />
       <workItem from="1655888220305" duration="5767000" />
-      <workItem from="1655933144595" duration="10263000" />
+      <workItem from="1655933144595" duration="13093000" />
+      <workItem from="1655996180688" duration="17664000" />
+      <workItem from="1656079825829" duration="5737000" />
+      <workItem from="1656152121959" duration="1424000" />
+      <workItem from="1656156418363" duration="22000" />
+      <workItem from="1656157396617" duration="1670000" />
+      <workItem from="1656171448367" duration="8063000" />
+      <workItem from="1656240811612" duration="644000" />
+      <workItem from="1656254143663" duration="1409000" />
+      <workItem from="1656323725920" duration="14380000" />
+      <workItem from="1656414996574" duration="1579000" />
     </task>
     <task id="LOCAL-00001" summary="Refactor preprocessing">
       <created>1652958322426</created>
@@ -607,7 +619,14 @@
       <option name="project" value="LOCAL" />
       <updated>1655224263663</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="Update data rejection pipeline">
+      <created>1655990346515</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1655990346515</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -641,23 +660,24 @@
     <MESSAGE value="Add generator improvements" />
     <MESSAGE value="Rework preprocessing of bars" />
     <MESSAGE value="Implement data rejection pipeline" />
-    <option name="LAST_COMMIT_MESSAGE" value="Implement data rejection pipeline" />
+    <MESSAGE value="Update data rejection pipeline" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update data rejection pipeline" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Paul$Store.coverage" NAME="Store Coverage Results" MODIFIED="1653901862365" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Train___Acmp.coverage" NAME="Train - Acmp Coverage Results" MODIFIED="1655969329242" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Store___Lead.coverage" NAME="Store - Lead Coverage Results" MODIFIED="1654594693208" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Generate___Lead.coverage" NAME="Generate - Lead Coverage Results" MODIFIED="1654595083113" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Train___Acmp.coverage" NAME="Train - Acmp Coverage Results" MODIFIED="1656082842883" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Store___Lead.coverage" NAME="Store - Lead Coverage Results" MODIFIED="1656325671357" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Generate___Lead.coverage" NAME="Generate - Lead Coverage Results" MODIFIED="1656338439038" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
     <SUITE FILE_PATH="coverage/Paul$Preprocess___Skip_MIDI.coverage" NAME="Preprocess - Skip MIDI Coverage Results" MODIFIED="1653136303282" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Train___Acmp_Continue.coverage" NAME="Train - Acmp Continue Coverage Results" MODIFIED="1654167962903" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Train___Acmp_Continue.coverage" NAME="Train - Acmp Continue Coverage Results" MODIFIED="1655991133922" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
     <SUITE FILE_PATH="coverage/Paul$.coverage" NAME=" Coverage Results" MODIFIED="1655734544274" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/analysis" />
     <SUITE FILE_PATH="coverage/Paul$main.coverage" NAME="Preprocess Coverage Results" MODIFIED="1652913168560" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Train___Lead.coverage" NAME="Train - Lead Coverage Results" MODIFIED="1655933273315" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Preprocess.coverage" NAME="Preprocess Coverage Results" MODIFIED="1655726010394" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Store___Acmp.coverage" NAME="Store - Acmp Coverage Results" MODIFIED="1654528574769" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/Paul$Generate___Acmp.coverage" NAME="Generate - Acmp Coverage Results" MODIFIED="1654529123488" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Train___Lead.coverage" NAME="Train - Lead Coverage Results" MODIFIED="1656190625150" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Preprocess.coverage" NAME="Preprocess Coverage Results" MODIFIED="1656416110523" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
     <SUITE FILE_PATH="coverage/Paul$Preprocess___Clean.coverage" NAME="Preprocess - Clean Coverage Results" MODIFIED="1655306782125" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Store___Acmp.coverage" NAME="Store - Acmp Coverage Results" MODIFIED="1656339205896" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Generate___Acmp.coverage" NAME="Generate - Acmp Coverage Results" MODIFIED="1656341265665" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
     <SUITE FILE_PATH="coverage/Paul$paul.coverage" NAME="paul Coverage Results" MODIFIED="1654518901813" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/network" />
-    <SUITE FILE_PATH="coverage/Paul$Train___Lead_Continue.coverage" NAME="Train - Lead Continue Coverage Results" MODIFIED="1655835626923" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/Paul$Train___Lead_Continue.coverage" NAME="Train - Lead Continue Coverage Results" MODIFIED="1656254155429" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
   </component>
 </project>

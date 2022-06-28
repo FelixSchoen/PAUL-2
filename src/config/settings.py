@@ -97,7 +97,9 @@ TRAIN_VAL_SPLIT = 0.95
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
-EPOCHS = 4
+EPOCHS = 9
+MAX_CHECKPOINTS_TO_KEEP = 30
+VAL_PER_BATCHES = 0.078125
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
@@ -105,7 +107,7 @@ EPOCHS = 4
 # Dimension of the model
 # Dimension of the feed-forward network
 # Dropout rate applied after some operations
-SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 1024,
+SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
 SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
@@ -116,6 +118,8 @@ SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, 
 
 # Determines how many sequences are generated in parallel when generating
 OUTPUT_DIMENSION = 16
+# Maximum note length in ticks
+MAXIMUM_NOTE_LENGTH = 24
 # The amount of consecutive bars to generate
 BARS_TO_GENERATE = 4
 # The initial amount of consecutive bars to generate, before checking if they all conform to the same difficulty

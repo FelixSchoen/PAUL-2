@@ -325,7 +325,7 @@ def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
     lead_chunked = []
     acmp_chunked = []
 
-    stride = int(CONSECUTIVE_BAR_MAX_LENGTH)
+    stride = int(CONSECUTIVE_BAR_MAX_LENGTH / 2)
 
     for i in range(0, len(bars), stride):
         lead_current = []

@@ -7,7 +7,8 @@ from sCoda.elements.message import MessageType, Message
 
 from src.config.settings import D_TYPE, START_TOKEN, SEQUENCE_MAX_LENGTH, STOP_TOKEN, SETTINGS_LEAD_TRANSFORMER, \
     SETTINGS_ACMP_TRANSFORMER, VALID_TIME_SIGNATURES, OUTPUT_DIMENSION, PADDING_TOKEN, CONSECUTIVE_BAR_MAX_LENGTH, \
-    BARS_TO_GENERATE
+    BARS_TO_GENERATE, MAXIMUM_NOTE_LENGTH
+from src.exception.exceptions import UnexpectedValueException
 from src.preprocessing.preprocessing import Tokenizer, Detokenizer
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
@@ -47,8 +48,8 @@ class Generator(tf.Module):
                 dif_tensor_array = dif_tensor_array.write(i, dif_value)
             dif_tensor_array = dif_tensor_array.write(0, START_TOKEN)
             dif_tensor_array = dif_tensor_array.write(SEQUENCE_MAX_LENGTH - 1, STOP_TOKEN)
-
             dif_tensor_arrays.append(dif_tensor_array)
+
         dif_tensor = Generator._create_tensor_from_tensor_arrays(dif_tensor_arrays)
 
         # Build lead tensor
@@ -66,7 +67,7 @@ class Generator(tf.Module):
         if self.network_type == NetworkType.lead:
             input_tensors = [dif_tensor]
         elif self.network_type == NetworkType.acmp:
-            input_tensors = [lead_tensor, dif_tensor]
+            input_tensors = [dif_tensor, lead_tensor]
         else:
             raise NotImplementedError
 
@@ -76,18 +77,20 @@ class Generator(tf.Module):
         pool = multiprocessing.Pool()
         bars_list = [bars_to_generate for _ in range(OUTPUT_DIMENSION)]
         force_time_signature_list = [self.network_type == NetworkType.lead for _ in range(OUTPUT_DIMENSION)]
+        maximum_length_list = [-1 for _ in range(OUTPUT_DIMENSION)]
 
         # Loop for up to remaining tokens time
-        for i in tf.range(1 + len_input_seq, SEQUENCE_MAX_LENGTH - 1):
+        for i in tf.range(len_input_seq, SEQUENCE_MAX_LENGTH - 1):
             output_tensor = Generator._create_tensor_from_tensor_arrays(output_tensor_arrays)
 
-            # Interference
+            # Inference
             predictions, _ = self.transformer([input_tensors, output_tensor], training=False)
-            prediction_tensor = predictions[:, i - 1]
+            prediction_tensor = predictions[:, i]
 
             # Create and apply valid messages mask
             valid_messages_list = list(pool.starmap(Generator._create_valid_messages_from_sequence,
-                                                    zip(output_sequences, bars_list, force_time_signature_list)))
+                                                    zip(output_sequences, bars_list, force_time_signature_list,
+                                                        maximum_length_list)))
 
             mask = Generator._create_mask_from_valid_messages(valid_messages_list,
                                                               mask_length=settings["OUTPUT_SIZE"],
@@ -115,7 +118,7 @@ class Generator(tf.Module):
                 prediction = predictions[d]
 
                 # Write prediction to output tensor
-                output_tensor_array.write(i + 1, prediction)
+                output_tensor_array.write(i, prediction)
 
                 # Check if end of sequence was predicted
                 if prediction.numpy() == STOP_TOKEN:
@@ -160,7 +163,10 @@ class Generator(tf.Module):
         data_frame = sequence.to_relative_dataframe()
         tokens = []
         for _, row in data_frame.iterrows():
-            tokens.extend(tokenizer.tokenize(row))
+            try:
+                tokens.extend(tokenizer.tokenize(row))
+            except UnexpectedValueException:
+                pass
         tokens.extend(tokenizer.flush_wait_buffer())
 
         assert len(tokens) <= SEQUENCE_MAX_LENGTH - 2
@@ -174,7 +180,7 @@ class Generator(tf.Module):
             for j, tensor_array in enumerate(tensor_arrays):
                 tensor_arrays[j] = tensor_array.write(end_index, STOP_TOKEN)
 
-        return tensor_arrays, len(tokens)
+        return tensor_arrays, len(tokens) + 1 + (1 if write_stop_token else 0)
 
     @staticmethod
     def _create_tensor_from_tensor_arrays(tensor_arrays):
@@ -182,9 +188,10 @@ class Generator(tf.Module):
         return tensor
 
     @staticmethod
-    def _create_valid_messages_from_sequence(sequence, desired_bars, force_time_signature):
+    def _create_valid_messages_from_sequence(sequence, desired_bars, force_time_signature, maximum_note_length):
         return sequence.rel.get_valid_next_messages(desired_bars=desired_bars,
-                                                    force_time_siganture=force_time_signature)
+                                                    force_time_siganture=force_time_signature,
+                                                    maximum_note_length=maximum_note_length)
 
     @staticmethod
     def _create_mask_from_valid_messages(valid_messages_list, mask_length, finished_sequence_indices):

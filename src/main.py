@@ -1,6 +1,6 @@
 import argparse
 
-from sCoda import Sequence
+from sCoda import Sequence, Bar
 
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
@@ -58,7 +58,7 @@ def main():
     elif args.command == "store":
         network_type = NetworkType.lead if args.network == "lead" else NetworkType.acmp
         store_checkpoint(network_type=network_type, run_identifier=args.run_identifier,
-                         checkpoint_identifier=int(args.checkpoint_identifier) - 1)
+                         checkpoint_identifier=int(args.checkpoint_identifier))
     elif args.command == "generate":
         if args.track == "lead":
             logger.info(f"Generating lead track with difficulty {args.difficulty}...")
@@ -69,9 +69,16 @@ def main():
             logger.info(f"Generating acmp track with difficulty {args.difficulty}...")
 
             # TODO
-            lead_seq = \
-            Sequence.from_midi_file(f"{get_prj_root()}/out/paul/gen/lead/20220606-163834_4.mid", [[0]], [0])[
-                0]
+            sequences = Sequence.from_midi_file("../test/resources/chopin_o66_fantaisie_impromptu.mid", [[0]], [0])
+
+            for sequence in sequences:
+                sequence.quantise()
+                sequence.quantise_note_lengths()
+
+            sequence_lead = sequences[0]
+            bars = Sequence.split_into_bars([sequence_lead])
+            lead_bars = bars[0]
+            lead_seq = Bar.to_sequence(lead_bars[4:7])
 
             generate(network_type=NetworkType.acmp, model_identifier=args.model_identifier,
                      difficulty=args.difficulty - 1, lead_seq=lead_seq)
