@@ -272,7 +272,7 @@ def _load_midi_load_composition_and_scale(file_path: str) -> [Composition]:
 
     """
     compositions = []
-    scale_factors = [1, 2]
+    scale_factors = [1]
 
     # Load sequences from file
     sequences = _load_midi_file(file_path)
@@ -325,7 +325,7 @@ def _load_midi_extract_bars(composition: Composition) -> [([Bar], [Bar])]:
     lead_chunked = []
     acmp_chunked = []
 
-    stride = int(CONSECUTIVE_BAR_MAX_LENGTH / 2)
+    stride = int(CONSECUTIVE_BAR_MAX_LENGTH)
 
     for i in range(0, len(bars), stride):
         lead_current = []

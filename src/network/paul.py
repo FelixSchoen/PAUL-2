@@ -5,15 +5,15 @@ from datetime import datetime
 from math import floor
 
 import tensorflow as tf
-from sCoda import Sequence, Bar, Message
+from sCoda import Sequence, Message
 from sCoda.elements.message import MessageType
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
 from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     INPUT_VOCAB_SIZE_DIF, PATH_CHECKPOINT, BUFFER_SIZE, SHUFFLE_SEED, SEQUENCE_MAX_LENGTH, EPOCHS, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, PATH_MIDI, \
-    BARS_TO_GENERATE, BAR_GENERATION_STEP_SIZE, START_TEMPERATURE, VAL_PER_BATCHES, MAX_CHECKPOINTS_TO_KEEP, \
+    DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, VAL_PER_BATCHES, \
+    MAX_CHECKPOINTS_TO_KEEP, \
     MAXIMUM_NOTE_LENGTH
 from src.network.attention import AttentionType
 from src.network.generator import Generator
@@ -24,7 +24,7 @@ from src.network.transformer import Transformer
 from src.preprocessing.preprocessing import load_records
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
-from src.util.util import get_src_root, convert_difficulty, get_prj_root
+from src.util.util import get_src_root, get_prj_root
 
 
 def get_strategy():
@@ -133,11 +133,13 @@ def train_network(network_type, run_identifier=None):
         amount_batches = amount_train_batches + amount_val_batches
         logger.info(f"Overall dataset consists of {amount_batches} batches.")
 
-        amount_train_samples = batch_size * amount_train_batches
-        logger.info(f"Train dataset consists of {amount_train_samples} samples.")
+        # amount_train_samples = batch_size * amount_train_batches
+        # logger.info(f"Train dataset consists of {amount_train_samples} samples.")
+        #
+        # amount_val_samples = batch_size * amount_val_batches
+        # logger.info(f"Validation dataset consists of {amount_val_samples} samples.")
 
-        amount_val_samples = batch_size * amount_val_batches
-        logger.info(f"Validation dataset consists of {amount_val_samples} samples.")
+        logger.info(f"Creating a checkpoint every {int(amount_train_batches / val_per_epoch)} batches.")
 
         logger.info("Constructing model...")
 
@@ -191,6 +193,21 @@ def train_network(network_type, run_identifier=None):
         else:
             train_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/train"
             val_log_dir = f"{PATH_TENSORBOARD}/{network_type.value}/{run_identifier}/val"
+
+        # Save settings to file
+        try:
+            with open(f"{checkpoint_path}/settings.txt", "x") as f:
+                print(f"Batches: {amount_batches}", file=f)
+                print(f"Train Batches: {amount_train_batches}", file=f)
+                print(f"Validation Batches: {amount_val_batches}", file=f)
+                print(f"Layers: {settings['NUM_LAYERS']}", file=f)
+                print(f"Heads: {settings['NUM_HEADS']}", file=f)
+                print(f"Dimension Model: {settings['D_MODEL']}", file=f)
+                print(f"Dimension Feed Forward Network: {settings['DFF']}", file=f)
+                print(f"Dropout: {settings['DROPOUT_RATE']}", file=f)
+                print(f"Batch Size: {settings['BATCH_SIZE']}", file=f)
+        except FileExistsError:
+            pass
 
         # Tensorboard setup
         train_summary_writer = tf.summary.create_file_writer(train_log_dir)
@@ -275,16 +292,20 @@ def train_network(network_type, run_identifier=None):
                         f"[E{epoch + 1:02d}]: Val Loss {val_loss.result():.4f}, Val Accuracy {val_accuracy.result():.4f}. "
                         f"Time taken: {round(time.time() - epoch_timer, 2)}s")
 
+                    val_loss.reset_states()
+                    val_accuracy.reset_states()
+
                     # Save checkpoint
                     checkpoint_save_path = checkpoint_manager.save(checkpoint_number=step)
                     logger.info(f"[E{epoch + 1:02d}]: Saving checkpoint at {checkpoint_save_path}.")
 
                 # Logging
                 mem_usage = tf.config.experimental.get_memory_info("GPU:0")
-                logger.info(
-                    f"[E{epoch + 1:02d}B{batch_num + 1:05d}S{optimizer.iterations.numpy():05d}]: "
-                    f"Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
-                    f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
+                if (batch_num + 1) % 50 == 0:
+                    logger.info(
+                        f"[E{epoch + 1:02d}B{batch_num + 1:05d}S{optimizer.iterations.numpy():05d}]: "
+                        f"Loss {train_loss.result():.4f}, Accuracy {train_accuracy.result():.4f}. "
+                        f"Time taken: {round(time.time() - batch_timer, 2):.2f}s ({mem_usage['peak'] / 1e+9 :.2f} GB)")
 
                 # Reset timer
                 batch_timer = time.time()
@@ -334,7 +355,7 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
                                              temperature=0.6,
                                              bars_to_generate=4)
     for i, seq in enumerate(sequences):
-        seq.cutoff(2*MAXIMUM_NOTE_LENGTH, MAXIMUM_NOTE_LENGTH)
+        seq.cutoff(2 * MAXIMUM_NOTE_LENGTH, MAXIMUM_NOTE_LENGTH)
         seq.save(f"{get_prj_root()}/out/temp/{network_type}_{i}.mid")
 
     # TODO End

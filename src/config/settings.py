@@ -97,9 +97,9 @@ TRAIN_VAL_SPLIT = 0.95
 SHUFFLE_SEED = 6512924  # Felix
 BUFFER_SIZE = 150000
 
-EPOCHS = 9
-MAX_CHECKPOINTS_TO_KEEP = 30
-VAL_PER_BATCHES = 0.078125
+EPOCHS = 10
+MAX_CHECKPOINTS_TO_KEEP = 50
+VAL_PER_BATCHES = 1/128
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
@@ -107,9 +107,9 @@ VAL_PER_BATCHES = 0.078125
 # Dimension of the model
 # Dimension of the feed-forward network
 # Dropout rate applied after some operations
-SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 128, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
+SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 512, "DFF": 512,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
-SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 256,
+SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 512,
                              "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
 
 # ==================
