@@ -1,4 +1,4 @@
-sCoda >= 0.3
+sCoda >= 1.0
 numpy >= 1.22.3
 tensorflow >= 2.8.0
 matplotlib >= 3.5.1

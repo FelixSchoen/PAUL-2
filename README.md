@@ -3,3 +3,11 @@
 This repository contains the code of our algorithmic composer PAUL-2.
 PAUL-2 is a [transformer](https://arxiv.org/abs/1706.03762) based algorithmic composer utilising the enhancements made by the [Music Transformer](https://arxiv.org/abs/1809.04281).
 We refer to the full thesis for more information on PAUL-2.
+
+## Requirements
+
+- s-coda 1.0
+- tensorflow 2.8
+- numpy 1.22
+- pandas 1.4
+- mido 1.2

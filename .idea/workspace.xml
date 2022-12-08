@@ -4,676 +4,96 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b9f1f220-fe63-43a1-a011-91525046ee3e" name="Changes" comment="Implement saving of train settings">
-      <change afterPath="$PROJECT_DIR$/analysis/res/chopin_o66_fantaisie_impromptu.mid" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Paul.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Paul.iml" afterDir="false" />
+    <list default="true" id="b9f1f220-fe63-43a1-a011-91525046ee3e" name="Changes" comment="Add meta code">
+      <change afterPath="$PROJECT_DIR$/.idea/PAUL-2.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/DiplomaThesis.pdf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/resources/chopin_o66_fantaisie_impromptu.mid" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Paul.iml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis/analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/network/layers.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/layers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/network/paul.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/network/paul.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/test_network.py" beforeDir="false" afterPath="$PROJECT_DIR$/test/test_network.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="Git.Settings">
-    <option name="RECENT_BRANCH_BY_REPOSITORY">
-      <map>
-        <entry key="$PROJECT_DIR$" value="9f955ef758f418932dd8c2dbcfd77fa3242a256d" />
-      </map>
-    </option>
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
-    <option name="RESET_MODE" value="HARD" />
-  </component>
-  <component name="GitRewordedCommitMessages">
-    <option name="commitMessagesMapping">
-      <RewordedCommitMessageMapping>
-        <option name="originalMessage" value="Intermediate generator commit" />
-        <option name="rewordedMessage" value="Rework generator" />
-      </RewordedCommitMessageMapping>
-    </option>
-    <option name="currentCommit" value="1" />
-    <option name="onto" value="eac4516a655e5c8105d0c7fe17dc6b7d105cf29f" />
-  </component>
-  <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/VirtualEnv/Lib/site-packages/sCoda/sequence/sequence.py" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/analysis/analysis.py" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/out/paul/checkpoint/lead/lead 20220629-143628/settings.txt" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/src/config/settings.py" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/src/network/paul.py" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/src/preprocessing/preprocessing.py" root0="FORCE_HIGHLIGHTING" />
-  </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
-  <component name="ProjectId" id="29M0xYPb1IMI58NQ5Lig8AI1FwU" />
+  <component name="ProjectId" id="2Idvy2ybzsgc238o8Xfj9TBylds" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Project.color&quot;: &quot;0e5328&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/Documents/Coding/Repository/Paul&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "last_opened_file_path": "D:/Documents/Coding/Repository/PAUL-2/analysis",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "configurable.group.project",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="D:\Documents\Coding\Repository\Paul\out\paul\gen\survey_lead" />
-      <recent name="D:\Documents\Coding\Repository\Paul\out\paul\gen\lead" />
-      <recent name="D:\Documents\Coding\Repository\Paul\analysis\res" />
-      <recent name="D:\Documents\Coding\Repository\Paul\out\paul\checkpoint\lead\lead 20220629-143628" />
-      <recent name="D:\Documents\Coding\Repository\Paul\out\temp" />
+      <recent name="D:\Documents\Coding\Repository\PAUL-2\analysis" />
+      <recent name="D:\Documents\Coding\Repository\PAUL-2\analysis\res" />
+      <recent name="D:\Documents\Coding\Repository\PAUL-2" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
-      <recent name="D:\Documents\Coding\Repository\Paul\out\paul\gen" />
+      <recent name="D:\Documents\Coding\Repository\PAUL-2\meta\out" />
+      <recent name="D:\Documents\Coding\Repository\PAUL-2\analysis\analysis" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.Preprocess">
-    <configuration name="Generate - Acmp" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="generate acmp --model_identifier acmp --difficulty 5 --seq_identifier 20220718-230316_5 -f survey_lead -t 10" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Generate - Lead" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="generate lead --model_identifier lead --difficulty 6 -t 10" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Preprocess - Clean" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="preprocess --clean" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Preprocess - Skip MIDI" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="preprocess --skip_midi" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Preprocess" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="preprocess" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Store - Acmp" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="store acmp --run_identifier 20220708-004205 --checkpoint_identifier 30" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Store - Lead" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="store lead --run_identifier 20220629-143628 --checkpoint_identifier 20" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Train - Acmp Continue" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="train acmp --run_identifier 20220706-161156" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Train - Acmp" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="train acmp" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Train - Lead Continue" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="train lead --run_identifier 20220629-143628" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Train - Lead" type="PythonConfigurationType" factoryName="Python">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/main.py" />
-      <option name="PARAMETERS" value="train lead" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Analysis" type="tests" factoryName="Autodetect">
-      <module name="Paul" />
+  <component name="RunManager">
+    <configuration default="true" type="tests" factoryName="Autodetect">
+      <module name="PAUL-2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/analysis" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="_new_additionalArguments" value="&quot;-s&quot;" />
-      <option name="_new_target" value="&quot;analysis.test_analysis&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Python tests for analysis.test_analyse_confusion_matrix" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/analysis" />
-      <option name="IS_MODULE_SDK" value="true" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;analysis.test_analyse_confusion_matrix&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+      <option name="_new_target" value="&quot;&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
       <method v="2" />
     </configuration>
-    <configuration name="Python tests for analysis.test_masks" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
-      <module name="Paul" />
+    <configuration default="true" type="tests" factoryName="Doctests">
+      <module name="PAUL-2" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/analysis" />
-      <option name="IS_MODULE_SDK" value="true" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;analysis.test_masks&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="CLASS_NAME" value="" />
+      <option name="METHOD_NAME" value="" />
+      <option name="FOLDER_NAME" value="" />
+      <option name="TEST_TYPE" value="TEST_SCRIPT" />
+      <option name="PATTERN" value="" />
+      <option name="USE_PATTERN" value="false" />
       <method v="2" />
     </configuration>
-    <configuration name="Python tests for analysis.test_search_real_pieces_of_difficulties" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
-      <module name="Paul" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/analysis" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="_new_additionalArguments" value="&quot;-s&quot;" />
-      <option name="_new_target" value="&quot;analysis.test_search_real_pieces_of_difficulties&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
-      <method v="2" />
-    </configuration>
-    <list>
-      <item itemvalue="Python.Preprocess" />
-      <item itemvalue="Python.Preprocess - Clean" />
-      <item itemvalue="Python.Preprocess - Skip MIDI" />
-      <item itemvalue="Python.Train - Lead" />
-      <item itemvalue="Python.Train - Lead Continue" />
-      <item itemvalue="Python.Train - Acmp" />
-      <item itemvalue="Python.Train - Acmp Continue" />
-      <item itemvalue="Python.Store - Lead" />
-      <item itemvalue="Python.Store - Acmp" />
-      <item itemvalue="Python.Generate - Lead" />
-      <item itemvalue="Python.Generate - Acmp" />
-      <item itemvalue="Python tests.Analysis" />
-      <item itemvalue="Python tests.Python tests for analysis.test_search_real_pieces_of_difficulties" />
-      <item itemvalue="Python tests.Python tests for analysis.test_analyse_confusion_matrix" />
-      <item itemvalue="Python tests.Python tests for analysis.test_masks" />
-    </list>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Python tests.Python tests for analysis.test_search_real_pieces_of_difficulties" />
-        <item itemvalue="Python tests.Python tests for analysis.test_analyse_confusion_matrix" />
-        <item itemvalue="Python tests.Python tests for analysis.test_masks" />
-      </list>
-    </recent_temporary>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="b9f1f220-fe63-43a1-a011-91525046ee3e" name="Changes" comment="" />
-      <created>1652907899900</created>
+      <changelist id="b9f1f220-fe63-43a1-a011-91525046ee3e" name="Changes" comment="Update readme.md" />
+      <created>1670524526067</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1652907899900</updated>
-      <workItem from="1652907903441" duration="4958000" />
-      <workItem from="1652955817745" duration="17107000" />
-      <workItem from="1652977747789" duration="1008000" />
-      <workItem from="1652978810885" duration="9057000" />
-      <workItem from="1652999284282" duration="1811000" />
-      <workItem from="1653001302446" duration="26173000" />
-      <workItem from="1653081625187" duration="6404000" />
-      <workItem from="1653130255746" duration="8652000" />
-      <workItem from="1653162009057" duration="5470000" />
-      <workItem from="1653216723763" duration="21796000" />
-      <workItem from="1653342185327" duration="1025000" />
-      <workItem from="1653390568964" duration="11894000" />
-      <workItem from="1653477279254" duration="5907000" />
-      <workItem from="1653518370790" duration="2472000" />
-      <workItem from="1653561806442" duration="1573000" />
-      <workItem from="1653567971922" duration="6706000" />
-      <workItem from="1653646832885" duration="9604000" />
-      <workItem from="1653735833790" duration="9449000" />
-      <workItem from="1653819189610" duration="5886000" />
-      <workItem from="1653901413566" duration="1906000" />
-      <workItem from="1653903334397" duration="37000" />
-      <workItem from="1653903612884" duration="8706000" />
-      <workItem from="1653939030647" duration="458000" />
-      <workItem from="1653939521906" duration="55000" />
-      <workItem from="1653939589168" duration="14855000" />
-      <workItem from="1654068525091" duration="26074000" />
-      <workItem from="1654162680849" duration="3446000" />
-      <workItem from="1654166170821" duration="3764000" />
-      <workItem from="1654172931633" duration="622000" />
-      <workItem from="1654175876703" duration="50000" />
-      <workItem from="1654176076777" duration="10890000" />
-      <workItem from="1654205735095" duration="1869000" />
-      <workItem from="1654247641133" duration="3219000" />
-      <workItem from="1654511080483" duration="46000" />
-      <workItem from="1654511242798" duration="187000" />
-      <workItem from="1654511439209" duration="113000" />
-      <workItem from="1654511561092" duration="199000" />
-      <workItem from="1654511772198" duration="3535000" />
-      <workItem from="1654516035878" duration="18858000" />
-      <workItem from="1654594531131" duration="3700000" />
-      <workItem from="1654599050205" duration="6675000" />
-      <workItem from="1654683002600" duration="8501000" />
-      <workItem from="1654694676670" duration="9188000" />
-      <workItem from="1654766462555" duration="877000" />
-      <workItem from="1654767355689" duration="975000" />
-      <workItem from="1654773749852" duration="13642000" />
-      <workItem from="1654808296868" duration="11807000" />
-      <workItem from="1654894071760" duration="2592000" />
-      <workItem from="1654945178101" duration="8948000" />
-      <workItem from="1655021891565" duration="9523000" />
-      <workItem from="1655114371798" duration="6373000" />
-      <workItem from="1655132342567" duration="506000" />
-      <workItem from="1655201736845" duration="17702000" />
-      <workItem from="1655283906720" duration="3465000" />
-      <workItem from="1655288454053" duration="18621000" />
-      <workItem from="1655539687323" duration="6929000" />
-      <workItem from="1655721797592" duration="2579000" />
-      <workItem from="1655725985105" duration="8859000" />
-      <workItem from="1655800567322" duration="7163000" />
-      <workItem from="1655828625773" duration="2016000" />
-      <workItem from="1655888220305" duration="5767000" />
-      <workItem from="1655933144595" duration="13093000" />
-      <workItem from="1655996180688" duration="17664000" />
-      <workItem from="1656079825829" duration="5737000" />
-      <workItem from="1656152121959" duration="1424000" />
-      <workItem from="1656156418363" duration="22000" />
-      <workItem from="1656157396617" duration="1670000" />
-      <workItem from="1656171448367" duration="8063000" />
-      <workItem from="1656240811612" duration="644000" />
-      <workItem from="1656254143663" duration="1409000" />
-      <workItem from="1656323725920" duration="14380000" />
-      <workItem from="1656414996574" duration="8889000" />
-      <workItem from="1656429786580" duration="7921000" />
-      <workItem from="1656540861851" duration="8414000" />
-      <workItem from="1656627547106" duration="6000" />
-      <workItem from="1656675195691" duration="332000" />
-      <workItem from="1656691058271" duration="2618000" />
-      <workItem from="1657051997620" duration="3677000" />
-      <workItem from="1657125807339" duration="1223000" />
-      <workItem from="1657150157732" duration="6635000" />
-      <workItem from="1657201617310" duration="1484000" />
-      <workItem from="1657233623903" duration="12714000" />
-      <workItem from="1657368293741" duration="1743000" />
-      <workItem from="1657458186806" duration="7000" />
-      <workItem from="1657530344985" duration="6053000" />
-      <workItem from="1657813153780" duration="3596000" />
-      <workItem from="1657828296468" duration="880000" />
-      <workItem from="1657893221287" duration="1767000" />
-      <workItem from="1658146264908" duration="6035000" />
-      <workItem from="1658174488763" duration="5000" />
-      <workItem from="1658176242335" duration="702000" />
-      <workItem from="1658177509302" duration="4532000" />
-      <workItem from="1658227174150" duration="2338000" />
-      <workItem from="1658234673441" duration="622000" />
-      <workItem from="1658336226042" duration="4000" />
-      <workItem from="1658492238057" duration="629000" />
-      <workItem from="1658584615370" duration="627000" />
-      <workItem from="1658673272020" duration="595000" />
-      <workItem from="1658674511663" duration="29000" />
-      <workItem from="1658739734355" duration="606000" />
-      <workItem from="1668110112848" duration="176000" />
-      <workItem from="1668172586729" duration="1158000" />
-      <workItem from="1668376538985" duration="6000" />
-      <workItem from="1668518606855" duration="9882000" />
-      <workItem from="1668596601326" duration="9697000" />
-      <workItem from="1668675740046" duration="55000" />
-      <workItem from="1668675815036" duration="73000" />
-      <workItem from="1668676175792" duration="9231000" />
-      <workItem from="1668778468392" duration="8148000" />
-      <workItem from="1668956905011" duration="611000" />
-      <workItem from="1668978341402" duration="40000" />
-      <workItem from="1669935216583" duration="17000" />
-      <workItem from="1669935242363" duration="16000" />
-      <workItem from="1669935267020" duration="31000" />
-      <workItem from="1669935306752" duration="2146000" />
-      <workItem from="1669982716539" duration="97000" />
-      <workItem from="1669982910250" duration="234000" />
-      <workItem from="1669983676826" duration="1276000" />
-      <workItem from="1670000772112" duration="1091000" />
-      <workItem from="1670249434370" duration="605000" />
-      <workItem from="1670521309237" duration="363000" />
+      <updated>1670524526067</updated>
+      <workItem from="1670524527244" duration="212000" />
+      <workItem from="1670524789115" duration="2226000" />
     </task>
-    <task id="LOCAL-00001" summary="Refactor preprocessing">
-      <created>1652958322426</created>
-      <option name="number" value="00001" />
-      <option name="presentableId" value="LOCAL-00001" />
-      <option name="project" value="LOCAL" />
-      <updated>1652958322426</updated>
-    </task>
-    <task id="LOCAL-00002" summary="Fix record writing">
-      <created>1652965961964</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1652965961965</updated>
-    </task>
-    <task id="LOCAL-00003" summary="Speed up record creation">
-      <created>1652969375033</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1652969375033</updated>
-    </task>
-    <task id="LOCAL-00004" summary="Rework bar length">
-      <created>1653039960133</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1653039960133</updated>
-    </task>
-    <task id="LOCAL-00005" summary="Implement multi-sequence generation">
-      <created>1653060727365</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1653060727365</updated>
-    </task>
-    <task id="LOCAL-00006" summary="Fix generator">
-      <created>1653130475216</created>
-      <option name="number" value="00006" />
-      <option name="presentableId" value="LOCAL-00006" />
-      <option name="project" value="LOCAL" />
-      <updated>1653130475216</updated>
-    </task>
-    <task id="LOCAL-00007" summary="Rework data preprocessing to exclude scaled compositions from validation set">
-      <created>1653179166324</created>
-      <option name="number" value="00007" />
-      <option name="presentableId" value="LOCAL-00007" />
-      <option name="project" value="LOCAL" />
-      <updated>1653179166324</updated>
-    </task>
-    <task id="LOCAL-00008" summary="Implement sCoda changes">
-      <created>1653992984510</created>
-      <option name="number" value="00008" />
-      <option name="presentableId" value="LOCAL-00008" />
-      <option name="project" value="LOCAL" />
-      <updated>1653992984510</updated>
-    </task>
-    <task id="LOCAL-00009" summary="Change position embedding value ranges">
-      <created>1654094175217</created>
-      <option name="number" value="00009" />
-      <option name="presentableId" value="LOCAL-00009" />
-      <option name="project" value="LOCAL" />
-      <updated>1654094175217</updated>
-    </task>
-    <task id="LOCAL-00010" summary="Implement support for different attention types per layer">
-      <created>1654102416093</created>
-      <option name="number" value="00010" />
-      <option name="presentableId" value="LOCAL-00010" />
-      <option name="project" value="LOCAL" />
-      <updated>1654102416093</updated>
-    </task>
-    <task id="LOCAL-00011" summary="Rework mask assignment">
-      <created>1654105733719</created>
-      <option name="number" value="00011" />
-      <option name="presentableId" value="LOCAL-00011" />
-      <option name="project" value="LOCAL" />
-      <updated>1654105733719</updated>
-    </task>
-    <task id="LOCAL-00012" summary="Intermediate generator commit">
-      <created>1654519027376</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
-      <option name="project" value="LOCAL" />
-      <updated>1654519027376</updated>
-    </task>
-    <task id="LOCAL-00013" summary="Rework generator">
-      <created>1654522970444</created>
-      <option name="number" value="00013" />
-      <option name="presentableId" value="LOCAL-00013" />
-      <option name="project" value="LOCAL" />
-      <updated>1654522970444</updated>
-    </task>
-    <task id="LOCAL-00014" summary="Add generator improvements">
-      <created>1654596185290</created>
-      <option name="number" value="00014" />
-      <option name="presentableId" value="LOCAL-00014" />
-      <option name="project" value="LOCAL" />
-      <updated>1654596185290</updated>
-    </task>
-    <task id="LOCAL-00015" summary="Rework preprocessing of bars">
-      <created>1654596247241</created>
-      <option name="number" value="00015" />
-      <option name="presentableId" value="LOCAL-00015" />
-      <option name="project" value="LOCAL" />
-      <updated>1654596247241</updated>
-    </task>
-    <task id="LOCAL-00016" summary="Implement data rejection pipeline">
-      <created>1655224263663</created>
-      <option name="number" value="00016" />
-      <option name="presentableId" value="LOCAL-00016" />
-      <option name="project" value="LOCAL" />
-      <updated>1655224263663</updated>
-    </task>
-    <task id="LOCAL-00017" summary="Update data rejection pipeline">
-      <created>1655990346515</created>
-      <option name="number" value="00017" />
-      <option name="presentableId" value="LOCAL-00017" />
-      <option name="project" value="LOCAL" />
-      <updated>1655990346515</updated>
-    </task>
-    <task id="LOCAL-00018" summary="Fix accompanying generator">
-      <created>1656417260997</created>
-      <option name="number" value="00018" />
-      <option name="presentableId" value="LOCAL-00018" />
-      <option name="project" value="LOCAL" />
-      <updated>1656417260997</updated>
-    </task>
-    <task id="LOCAL-00019" summary="Implement saving of train settings">
-      <created>1657151768170</created>
-      <option name="number" value="00019" />
-      <option name="presentableId" value="LOCAL-00019" />
-      <option name="project" value="LOCAL" />
-      <updated>1657151768170</updated>
-    </task>
-    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -691,26 +111,8 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Refactor preprocessing" />
-    <MESSAGE value="Fix record writing" />
-    <MESSAGE value="Speed up record creation" />
-    <MESSAGE value="Rework bar length" />
-    <MESSAGE value="Implement multi-sequence generation" />
-    <MESSAGE value="Fix generator" />
-    <MESSAGE value="Rework data preprocessing to exclude scaled compositions from validation set" />
-    <MESSAGE value="Implement sCoda changes" />
-    <MESSAGE value="Change position embedding value ranges" />
-    <MESSAGE value="Implement support for different attention types per layer" />
-    <MESSAGE value="Rework mask assignment" />
-    <MESSAGE value="Intermediate generator commit" />
-    <MESSAGE value="Rework generator" />
-    <MESSAGE value="Add generator improvements" />
-    <MESSAGE value="Rework preprocessing of bars" />
-    <MESSAGE value="Implement data rejection pipeline" />
-    <MESSAGE value="Update data rejection pipeline" />
-    <MESSAGE value="Fix accompanying generator" />
-    <MESSAGE value="Implement saving of train settings" />
-    <option name="LAST_COMMIT_MESSAGE" value="Implement saving of train settings" />
+    <MESSAGE value="Add meta code" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add meta code" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Paul$Train___Lead_Continue.coverage" NAME="Train - Lead Continue Coverage Results" MODIFIED="1656540872035" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />

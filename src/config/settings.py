@@ -20,7 +20,7 @@ def get_project_root() -> str:
 ROOT_PATH = get_project_root()
 
 # Where to load raw MIDI files from
-DATA_MIDI_INPUT_PATH = "D:/Documents/Coding/Repository/Paul/data/dataset"
+DATA_MIDI_INPUT_PATH = "//data/dataset"
 DATA_MIDI_INPUT_PATH_SPARSE = "D:/Drive/Documents/University/Master/4. Semester/Diplomarbeit/Resource/sparse_data"
 
 # Where to store processed bars for quicker loading

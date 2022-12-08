@@ -85,7 +85,7 @@ def main():
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Paul: An Algorithmic Composer supporting Difficulty Specification")
+    parser = argparse.ArgumentParser(description="PAUL-2: An Algorithmic Composer supporting Difficulty Specification")
     subparsers = parser.add_subparsers(title="Valid Commands",
                                        help="Selects the mode of operation.")
 
