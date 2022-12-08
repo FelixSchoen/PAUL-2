@@ -155,12 +155,12 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         # Sequence is not longer than max_sequence, can fit entirely
         if max_len >= seq_len:
-            val = np.arange(-1 * seq_len + 1, 1)
+            val = np.arange(max_len - seq_len, max_len)
             return E(val)
 
         # For sequences that are too long, simply set maximum distance for values that are too far apart
-        pre = [-1 * max_len + 1 for _ in range(seq_len - max_len)]
-        post = np.arange(-1 * max_len + 1, 1)
+        pre = [0 for _ in range(seq_len - max_len)]
+        post = np.arange(0, max_len)
         val = np.concatenate((pre, post))
         return E(val)
 

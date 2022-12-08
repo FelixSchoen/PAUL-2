@@ -3,7 +3,7 @@ import argparse
 from sCoda import Sequence, Bar
 
 from src.config.settings import DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_TRAIN_OUTPUT_FILE_PATH, \
-    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH
+    DATA_BARS_VAL_OUTPUT_FOLDER_PATH, DATA_VAL_OUTPUT_FILE_PATH, DATA_MIDI_INPUT_PATH, PATH_MIDI
 from src.network.paul import train_network, generate, store_checkpoint
 from src.preprocessing.preprocessing import store_records, load_midi, clean_midi
 from src.util.enumerations import NetworkType
@@ -60,28 +60,28 @@ def main():
         store_checkpoint(network_type=network_type, run_identifier=args.run_identifier,
                          checkpoint_identifier=int(args.checkpoint_identifier))
     elif args.command == "generate":
-        if args.track == "lead":
-            logger.info(f"Generating lead track with difficulty {args.difficulty}...")
+        times = 1
+        if args.times is not None:
+            times = args.times
 
-            generate(network_type=NetworkType.lead, model_identifier=args.model_identifier,
-                     difficulty=args.difficulty - 1)
-        elif args.track == "acmp":
-            logger.info(f"Generating acmp track with difficulty {args.difficulty}...")
+        for _ in range(times):
+            if args.track == "lead":
+                logger.info(f"Generating lead track with difficulty {args.difficulty}...")
 
-            # TODO
-            sequences = Sequence.from_midi_file("../test/resources/chopin_o66_fantaisie_impromptu.mid", [[0]], [0])
+                generate(network_type=NetworkType.lead, model_identifier=args.model_identifier,
+                         difficulty=args.difficulty - 1)
+            elif args.track == "acmp":
+                logger.info(f"Generating acmp track with difficulty {args.difficulty}...")
 
-            for sequence in sequences:
-                sequence.quantise()
-                sequence.quantise_note_lengths()
+                folder = NetworkType.lead.value
+                if args.input_folder is not None:
+                    folder = args.input_folder
 
-            sequence_lead = sequences[0]
-            bars = Sequence.split_into_bars([sequence_lead])
-            lead_bars = bars[0]
-            lead_seq = Bar.to_sequence(lead_bars[4:7])
+                sequence_path = f"{PATH_MIDI}/{folder}/{args.seq_identifier}.mid"
+                sequence_lead = Sequence.from_midi_file(sequence_path, [[0]], [0])[0]
 
-            generate(network_type=NetworkType.acmp, model_identifier=args.model_identifier,
-                     difficulty=args.difficulty - 1, lead_seq=lead_seq)
+                generate(network_type=NetworkType.acmp, model_identifier=args.model_identifier,
+                         difficulty=args.difficulty - 1, lead_seq=sequence_lead, name=args.seq_identifier)
 
 
 def parse_arguments():
@@ -126,6 +126,12 @@ def parse_arguments():
                                  help="Determines the difficulty of the tracks to generate.")
     parser_generate.add_argument("--model_identifier", "-i", required=True,
                                  help="Determines which model to load.")
+    parser_generate.add_argument("--seq_identifier", "-s", required=False,
+                                 help="Determines which sequence to load for the lead track.")
+    parser_generate.add_argument("--times", "-t", type=int, choices=range(1, 11), required=False,
+                                 help="Determines how often to run the procedure.")
+    parser_generate.add_argument("--input_folder", "-f", required=False,
+                                 help="Determines which folder to load the leading samples from.")
 
     args = parser.parse_args()
     return args, parser

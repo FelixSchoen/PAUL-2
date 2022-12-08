@@ -2,16 +2,21 @@ import os
 from multiprocessing import Pool
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from matplotlib import pyplot as plt
-from sCoda import Sequence
+from sCoda import Sequence, Message, Bar
+from sCoda.elements.message import MessageType
 
-from src.config.settings import ROOT_PATH
-from src.network.generator import TemperatureSchedule
+from src.config.settings import ROOT_PATH, PATH_SAVED_MODEL, MAXIMUM_NOTE_LENGTH, DATA_MIDI_INPUT_PATH, \
+    DATA_BARS_TRAIN_OUTPUT_FOLDER_PATH, DATA_BARS_VAL_OUTPUT_FOLDER_PATH
+from src.network.generator import TemperatureSchedule, Generator
+from src.network.masking import create_look_ahead_mask, create_combined_mask, \
+    create_single_out_mask
+from src.network.paul import get_network_objects
+from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
 from src.util.util import pickle_load, convert_difficulty
-from src.network.masking import create_padding_mask, create_look_ahead_mask, MaskType, create_combined_mask, \
-    create_single_out_mask
 
 
 def test_analysis():
@@ -54,6 +59,138 @@ def test_analysis():
     logger.info("Drawn Combined Dif Diagram...")
     length_diagram(lengths, "lengths")
     logger.info("Drawn Length Diagram...")
+
+
+def test_analyse_confusion_matrix():
+    # actual_difficulties = []
+    # output_difficulties = []
+    #
+    # for dif in range(0, 10):
+    #     for _ in range(5):
+    #         new_difs = generate(NetworkType.lead, "lead", dif)
+    #         actual_difficulties.extend(dif for _ in range(len(new_difs)))
+    #         output_difficulties.extend(new_difs)
+    #
+    # data = {"actual": actual_difficulties, "output": output_difficulties}
+    # df = pd.DataFrame(data)
+    # df.to_pickle("out/dataframe.pkl")
+
+    sequences = Sequence.from_midi_file("res/chopin_o66_fantaisie_impromptu.mid", [[1], [2]], [0])
+    for sequence in sequences:
+        sequence.quantise()
+        sequence.quantise_note_lengths()
+
+    sequence_lead = sequences[0]
+
+    # Split sequence into bars
+    bar = Sequence.split_into_bars([sequence_lead])[0][4]
+    seq = Bar.to_sequence([bar])
+
+    actual_difficulties = []
+    output_difficulties = []
+
+    for dif in range(0, 10):
+        for _ in range(5):
+            new_difs = generate(NetworkType.acmp, "acmp", dif, lead_seq=seq)
+            actual_difficulties.extend(dif for _ in range(len(new_difs)))
+            output_difficulties.extend(new_difs)
+
+    data = {"actual": actual_difficulties, "output": output_difficulties}
+    df = pd.DataFrame(data)
+    df.to_pickle("out/dataframe.pkl")
+
+
+def test_search_real_pieces_of_difficulties():
+    difficulties = [1, 4, 7]
+
+    file_paths = []
+    for dir_path, _, filenames in os.walk(DATA_BARS_VAL_OUTPUT_FOLDER_PATH):
+        for file_name in [f for f in filenames if f.endswith(".zip")]:
+            file_paths.append((os.path.join(dir_path, file_name), file_name))
+
+    found_index = 0
+
+    for file_path in file_paths:
+        bars = pickle_load(file_path[0])
+        for group in bars:
+            lead = group[0]
+            acmp = group[1]
+
+            lead_dif_min = min([convert_difficulty(bar.difficulty()) for bar in lead])
+            lead_dif_max = max([convert_difficulty(bar.difficulty()) for bar in lead])
+            acmp_dif_min = min([convert_difficulty(bar.difficulty()) for bar in acmp])
+            acmp_dif_max = max([convert_difficulty(bar.difficulty()) for bar in acmp])
+
+            lead_seq = Bar.to_sequence(lead)
+            acmp_seq = Bar.to_sequence(acmp)
+
+            for msg in lead_seq.rel.messages:
+                if msg.message_type == MessageType.note_on:
+                    msg.velocity = 127
+            for msg in acmp_seq.rel.messages:
+                if msg.message_type == MessageType.note_on:
+                    msg.velocity = 127
+
+            time_sig = [msg for msg in lead_seq.rel.messages if msg.message_type == MessageType.time_signature]
+            if not all(msg.numerator == 4 and msg.denominator == 4 for msg in time_sig):
+                continue
+
+            # Lead
+            for dif in difficulties:
+                if lead_dif_min >= dif - 1 and lead_dif_max <= dif + 1:
+                    lead_seq.save(f"out/survey_samples/{found_index:06d}-lead-d{dif}-{file_path[1]}.mid")
+                    found_index += 1
+                    break
+
+            # Acmp
+            for dif in difficulties:
+                if acmp_dif_min >= dif - 1 and acmp_dif_max <= dif + 1:
+                    acmp_seq.save(f"out/survey_samples/{found_index:06d}-acmp-d{dif}-{file_path[1]}.mid")
+                    lead_seq.save(f"out/survey_samples/{found_index:06d}-acmpL-d{dif}-{file_path[1]}.mid")
+                    found_index += 1
+                    break
+
+
+def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
+             primer_sequence: Sequence = None, lead_seq: Sequence = None):
+    logger = get_logger(__name__)
+
+    assert not network_type == NetworkType.acmp or lead_seq is not None
+
+    # Load model
+    logger.info("Constructing model...")
+    transformer, _ = get_network_objects(network_type)
+    transformer.build_model()
+    transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
+
+    # Get difficulties of generated bars
+    output_difficulties = []
+
+    # Create sequence object
+    gen_seq = primer_sequence if primer_sequence is not None else Sequence()
+
+    # Start with 4/4 time signature if not provided
+    if primer_sequence is None:
+        gen_seq.rel.messages.append(Message(message_type=MessageType.time_signature, numerator=4, denominator=4))
+
+    # Load generator
+    generator = Generator(transformer, network_type, lead_sequence=lead_seq)
+
+    sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
+                                             temperature=0.6,
+                                             bars_to_generate=1)
+
+    for i, sequence in enumerate(sequences):
+        print(len(Sequence.split_into_bars([sequence])[0]))
+
+        sequence.quantise()
+        sequence.quantise_note_lengths()
+        sequence.cutoff(2 * MAXIMUM_NOTE_LENGTH, MAXIMUM_NOTE_LENGTH)
+
+        bar = Sequence.split_into_bars([sequence])[0][0]
+        output_difficulties.append(convert_difficulty(bar.difficulty()))
+
+    return output_difficulties
 
 
 def _analyse_values(file_tuple):

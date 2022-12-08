@@ -6,6 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/data/dataset" />
       <excludeFolder url="file://$MODULE_DIR$/analysis/bars" />
       <excludeFolder url="file://$MODULE_DIR$/out/bars" />
+      <excludeFolder url="file://$MODULE_DIR$/analysis/out/survey_samples" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -99,7 +99,7 @@ BUFFER_SIZE = 150000
 
 EPOCHS = 10
 MAX_CHECKPOINTS_TO_KEEP = 50
-VAL_PER_BATCHES = 1/128
+VAL_PER_BATCHES = 10/128
 
 # Parameters explained in order of appearance:
 # How often the encoder / decoder should be stacked
@@ -108,9 +108,9 @@ VAL_PER_BATCHES = 1/128
 # Dimension of the feed-forward network
 # Dropout rate applied after some operations
 SETTINGS_LEAD_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 512, "DFF": 512,
-                             "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE}
+                             "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": LEAD_OUTPUT_VOCAB_SIZE, "TEMP": 0.6}
 SETTINGS_ACMP_TRANSFORMER = {"BATCH_SIZE": 64, "NUM_LAYERS": 6, "NUM_HEADS": 4, "D_MODEL": 256, "DFF": 512,
-                             "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE}
+                             "DROPOUT_RATE": 0.2, "OUTPUT_SIZE": ACMP_OUTPUT_VOCAB_SIZE, "TEMP": 0.4}
 
 # ==================
 # === Generation ===
@@ -124,4 +124,3 @@ MAXIMUM_NOTE_LENGTH = 24
 BARS_TO_GENERATE = 4
 # The initial amount of consecutive bars to generate, before checking if they all conform to the same difficulty
 BAR_GENERATION_STEP_SIZE = 2
-START_TEMPERATURE = 0.4

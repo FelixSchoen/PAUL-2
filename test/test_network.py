@@ -225,8 +225,9 @@ def test_relative_scaled_dot_product_attention():
 
 
 def test_embeddings():
-    E = tf.keras.layers.Embedding(400, 200)
-    logger.info(f"Shape: {MultiHeadAttention.get_embeddings(E, 200, 512).shape}")
+    E = tf.keras.layers.Embedding(64, 4)
+    logger.info(f"Shape: {MultiHeadAttention.get_embeddings(E, 64, 32).shape}")
+    logger.info(MultiHeadAttention.get_embeddings(E, 64, 32))
 
 
 def test_relative_multi_head_attention():

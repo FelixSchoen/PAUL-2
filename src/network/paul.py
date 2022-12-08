@@ -3,9 +3,10 @@ import time
 from contextlib import nullcontext
 from datetime import datetime
 from math import floor
+from pathlib import Path
 
 import tensorflow as tf
-from sCoda import Sequence, Message
+from sCoda import Sequence, Message, Bar
 from sCoda.elements.message import MessageType
 from tensorflow.python.data.ops.options import AutoShardPolicy
 
@@ -14,7 +15,7 @@ from src.config.settings import LEAD_OUTPUT_VOCAB_SIZE, \
     PATH_TENSORBOARD, ACMP_OUTPUT_VOCAB_SIZE, INPUT_VOCAB_SIZE_MLD, PATH_SAVED_MODEL, DATA_TRAIN_OUTPUT_FILE_PATH, \
     DATA_VAL_OUTPUT_FILE_PATH, SETTINGS_LEAD_TRANSFORMER, SETTINGS_ACMP_TRANSFORMER, VAL_PER_BATCHES, \
     MAX_CHECKPOINTS_TO_KEEP, \
-    MAXIMUM_NOTE_LENGTH
+    MAXIMUM_NOTE_LENGTH, BARS_TO_GENERATE, BAR_GENERATION_STEP_SIZE, PATH_MIDI
 from src.network.attention import AttentionType
 from src.network.generator import Generator
 from src.network.masking import MaskType
@@ -24,7 +25,7 @@ from src.network.transformer import Transformer
 from src.preprocessing.preprocessing import load_records
 from src.util.enumerations import NetworkType
 from src.util.logging import get_logger
-from src.util.util import get_src_root, get_prj_root
+from src.util.util import get_src_root, get_prj_root, convert_difficulty
 
 
 def get_strategy():
@@ -196,6 +197,7 @@ def train_network(network_type, run_identifier=None):
 
         # Save settings to file
         try:
+            Path(checkpoint_path).mkdir(exist_ok=True)
             with open(f"{checkpoint_path}/settings.txt", "x") as f:
                 print(f"Batches: {amount_batches}", file=f)
                 print(f"Train Batches: {amount_train_batches}", file=f)
@@ -317,7 +319,7 @@ def train_network(network_type, run_identifier=None):
 
 
 def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
-             primer_sequence: Sequence = None, lead_seq: Sequence = None):
+             primer_sequence: Sequence = None, lead_seq: Sequence = None, name: str = ""):
     logger = get_logger(__name__)
 
     assert not network_type == NetworkType.acmp or lead_seq is not None
@@ -327,6 +329,7 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
     transformer, _ = get_network_objects(network_type)
     transformer.build_model()
     transformer.load_weights(f"{PATH_SAVED_MODEL}/{network_type.value}/model_{model_identifier}.h5")
+    settings = SETTINGS_LEAD_TRANSFORMER if network_type == NetworkType.lead else SETTINGS_ACMP_TRANSFORMER
 
     # Create sequence object
     gen_seq = primer_sequence if primer_sequence is not None else Sequence()
@@ -348,92 +351,79 @@ def generate(network_type: NetworkType, model_identifier: str, difficulty: int,
             bar.sequence.sequence_length() for bar in Sequence.split_into_bars([gen_seq])[0])) < 0:
         valid_bars_generated -= 1
 
-    max_discrepancy = 2
-
-    # TODO Start
-    sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
-                                             temperature=0.6,
-                                             bars_to_generate=4)
-    for i, seq in enumerate(sequences):
-        seq.cutoff(2 * MAXIMUM_NOTE_LENGTH, MAXIMUM_NOTE_LENGTH)
-        seq.save(f"{get_prj_root()}/out/temp/{network_type}_{i}.mid")
-
-    # TODO End
+    max_discrepancy = 1
 
     # Generate bars until desired number of bars has been generated
-    # TODO
-    # while valid_bars_generated < BARS_TO_GENERATE:
-    #     all_same_difficulty = False
-    #     step_size = min(BAR_GENERATION_STEP_SIZE, BARS_TO_GENERATE - valid_bars_generated)
-    #     temperature = START_TEMPERATURE
-    #     iteration = 0
-    #
-    #     # Generate until all the new bars conform to the difficulty
-    #     while not all_same_difficulty:
-    #         logger.info(
-    #             f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size} of difficulty {difficulty}, iteration {iteration + 1}.")
-    #         sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
-    #                                                  temperature=temperature,
-    #                                                  bars_to_generate=valid_bars_generated + step_size)
-    #
-    #         # Store index, consecutive bars of best found sequence so far
-    #         best_sequence = (-1, 0)
-    #
-    #         # Check all generated sequences
-    #         for i, sequence in enumerate(sequences):
-    #             # Quantise sequence
-    #             sequence.quantise()
-    #             sequence.quantise_note_lengths()
-    #
-    #             # Get difficulties of generated bars
-    #             output_difficulties = []
-    #
-    #             # Obtain newly generated bars
-    #             bars = Sequence.split_into_bars([sequence])
-    #             new_bars = bars[0][valid_bars_generated:]
-    #             new_bars = new_bars[:step_size]
-    #
-    #             # Calculate difficulties of new bars
-    #             for bar in new_bars:
-    #                 output_difficulties.append(convert_difficulty(bar.difficulty()))
-    #
-    #             # Calculate how many consecutive bar fall into valid range of difficulties
-    #             consecutive_good_bars = 0
-    #             for output_difficulty in output_difficulties:
-    #                 if difficulty - max_discrepancy <= output_difficulty <= difficulty + max_discrepancy:
-    #                     consecutive_good_bars += 1
-    #                 else:
-    #                     break
-    #
-    #             if consecutive_good_bars > best_sequence[1]:
-    #                 best_sequence = (i, consecutive_good_bars)
-    #                 logger.info(
-    #                     f"Found better sequence with {consecutive_good_bars} bar(s) and difficulties {output_difficulties}.")
-    #
-    #         if best_sequence[0] > -1:
-    #             valid_bars_generated += best_sequence[1]
-    #
-    #             gen_part = Sequence.split_into_bars([sequences[best_sequence[0]]])[0][:valid_bars_generated]
-    #             gen_seq = Bar.to_sequence(gen_part)
-    #
-    #             all_same_difficulty = True
-    #             break
-    #
-    #         # Adjust step size, temperature, iteration
-    #         if step_size % 2 == 0:
-    #             step_size = int(step_size / 2)
-    #         temperature *= 1.25
-    #         iteration += 1
-    #
-    # logger.info(f"Saving generated sequence...")
-    #
-    # current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    # output_path = f"{PATH_MIDI}/{network_type.value}/{current_time}_{difficulty}.mid"
-    # gen_seq.save(output_path)
-    # TODO
+    while valid_bars_generated < BARS_TO_GENERATE:
+        step_size = min(BAR_GENERATION_STEP_SIZE, BARS_TO_GENERATE - valid_bars_generated)
+        temperature = settings["TEMP"]
+        iteration = 0
 
-    # Backlog
-    # schedule = TemperatureSchedule(96, 12, 1 / 2, exponent=2.5, max_value=1, min_value=0.2)
+        # Generate until all the new bars conform to the difficulty
+        while True:
+            logger.info(
+                f"Generating bars {valid_bars_generated + 1} through {valid_bars_generated + step_size} of difficulty {difficulty}, iteration {iteration + 1}.")
+            sequences, attention_weights = generator(input_sequence=gen_seq, difficulty=difficulty,
+                                                     temperature=temperature,
+                                                     bars_to_generate=valid_bars_generated + step_size)
+
+            # Store index, consecutive bars of best found sequence so far
+            best_sequence = (-1, 0)
+
+            # Check all generated sequences
+            for i, sequence in enumerate(sequences):
+                # Quantise sequence
+                sequence.quantise()
+                sequence.quantise_note_lengths()
+                sequence.cutoff(2 * MAXIMUM_NOTE_LENGTH, MAXIMUM_NOTE_LENGTH)
+
+                # Get difficulties of generated bars
+                output_difficulties = []
+
+                # Obtain newly generated bars
+                bars = Sequence.split_into_bars([sequence])
+                new_bars = bars[0][valid_bars_generated:]
+                new_bars = new_bars[:step_size]
+
+                # Calculate difficulties of new bars
+                for bar in new_bars:
+                    if bar.is_empty():
+                        output_difficulties.append(-1)
+                    else:
+                        output_difficulties.append(convert_difficulty(bar.difficulty()))
+
+                # Calculate how many consecutive bar fall into valid range of difficulties
+                consecutive_good_bars = 0
+                for output_difficulty in output_difficulties:
+                    if difficulty - max_discrepancy <= output_difficulty <= difficulty + max_discrepancy:
+                        consecutive_good_bars += 1
+                    else:
+                        break
+
+                if consecutive_good_bars > best_sequence[1]:
+                    best_sequence = (i, consecutive_good_bars)
+                    logger.info(
+                        f"Found better sequence with {consecutive_good_bars} bar(s) and difficulties {output_difficulties}.")
+
+            if best_sequence[0] > -1:
+                valid_bars_generated += best_sequence[1]
+
+                gen_part = Sequence.split_into_bars([sequences[best_sequence[0]]])[0][:valid_bars_generated]
+                gen_seq = Bar.to_sequence(gen_part)
+
+                break
+
+            # Adjust step size, temperature, iteration
+            if step_size % 2 == 0:
+                step_size = int(step_size / 2)
+            temperature *= 1.25
+            iteration += 1
+
+    logger.info(f"Saving generated sequence...")
+
+    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_path = f"{PATH_MIDI}/{network_type.value}/{current_time}{'_N' if name != '' else ''}{name}_{difficulty}.mid"
+    gen_seq.save(output_path)
 
 
 def store_checkpoint(network_type, run_identifier, checkpoint_identifier):
