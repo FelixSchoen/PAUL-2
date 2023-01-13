@@ -1,9 +1,7 @@
 import time
 
 import tensorflow as tf
-import tensorflow_datasets as tfds
 # noinspection PyUnresolvedReferences
-import tensorflow_text
 from matplotlib import pyplot as plt
 
 from src.network.attention import scaled_dot_product_attention, AttentionType, skew, \
@@ -39,11 +37,13 @@ def test_positional_encoding():
 def test_padding_mask():
     x = tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]])
     logger.info(f"Padding mask: {create_padding_mask(x)}")
+    print(create_padding_mask(x))
 
 
 def test_look_ahead_mask():
     x = tf.random.uniform((1, 3))
     logger.info(f"Look ahead mask: {create_look_ahead_mask(x.shape[1])}")
+    print(create_look_ahead_mask(x.shape[1]))
 
 
 def test_single_out_mask():
